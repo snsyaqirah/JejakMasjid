@@ -71,8 +71,8 @@ const MasjidCard = ({ masjid }: { masjid: MasjidData }) => {
         {/* Quick Tags */}
         <div className="absolute bottom-3 left-3 flex gap-1.5 flex-wrap">
           {topTags.map((tag) => tag && (
-            <Badge key={tag.key} variant="secondary" className="bg-primary/90 text-primary-foreground font-sans text-xs backdrop-blur-sm">
-              {tag.emoji} {tag.label.split(" ").slice(1).join(" ")}
+             <Badge key={tag.key} variant="secondary" className="bg-primary/90 text-primary-foreground font-sans text-xs backdrop-blur-sm">
+               {tag.label}
             </Badge>
           ))}
         </div>

@@ -37,7 +37,7 @@ const AddMasjid = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     toast({
-      title: "Masjid berjaya ditambah! 🕌",
+      title: "Masjid berjaya ditambah!",
       description: `${form.name} kini boleh dilihat oleh komuniti. Ia akan disahkan selepas 3 pengesahan.`,
     });
     setForm({
@@ -108,12 +108,12 @@ const AddMasjid = () => {
             <h3 className="font-serif text-base font-semibold">Kemudahan</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { key: "hasOKUAccess", label: "♿ Mesra OKU (lift/wheelchair)" },
-                { key: "hasWomenSpace", label: "🧕 Ruang Solat Wanita" },
-                { key: "hasAC", label: "❄️ Aircon" },
-                { key: "hasWifi", label: "📶 WiFi" },
-                { key: "nearPublicTransport", label: "🚇 Dekat Public Transport" },
-              ].map((item) => (
+                 { key: "hasOKUAccess", label: "Mesra OKU (lift/wheelchair)" },
+                 { key: "hasWomenSpace", label: "Ruang Solat Wanita" },
+                 { key: "hasAC", label: "Aircon" },
+                 { key: "hasWifi", label: "WiFi" },
+                 { key: "nearPublicTransport", label: "Dekat Public Transport" },
+               ].map((item) => (
                 <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
                   <Checkbox
                     checked={form[item.key as keyof typeof form] as boolean}
@@ -125,7 +125,7 @@ const AddMasjid = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="font-medium">🅿️ Status Parking</Label>
+              <Label className="font-medium">Status Parking</Label>
               <div className="flex gap-2">
                 {([["luas", "Parking Luas"], ["terhad", "Terhad"], ["tiada", "Tiada Parking"]] as const).map(([val, label]) => (
                   <button
@@ -156,13 +156,13 @@ const AddMasjid = () => {
           <div className="rounded-2xl border bg-card p-6 space-y-5">
             <h3 className="font-serif text-base font-semibold">Info Ibadah</h3>
             <div className="flex gap-6">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={form.hasTerawih} onCheckedChange={(c) => setForm({ ...form, hasTerawih: !!c })} />
-                🌙 Ada Terawih
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
+               <label className="flex items-center gap-2 text-sm cursor-pointer">
+                 <Checkbox checked={form.hasTerawih} onCheckedChange={(c) => setForm({ ...form, hasTerawih: !!c })} />
+                 Ada Terawih
+               </label>
+               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <Checkbox checked={form.hasIftar} onCheckedChange={(c) => setForm({ ...form, hasIftar: !!c })} />
-                🍽️ Ada Iftar
+                Ada Iftar
               </label>
             </div>
 

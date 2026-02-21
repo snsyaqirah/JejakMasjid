@@ -46,12 +46,12 @@ const MasjidDetail = () => {
 
   const handleTrack = (type: string) => {
     if (requireLogin(`merekod ${type}`)) return;
-    toast({ title: `${type} direkodkan! 🕌`, description: `Kunjungan anda ke ${masjid?.name} telah disimpan.` });
+    toast({ title: `${type} direkodkan!`, description: `Kunjungan anda ke ${masjid?.name} telah disimpan.` });
   };
 
   const handleVerify = () => {
     if (requireLogin("mengesahkan masjid")) return;
-    toast({ title: "Terima kasih! ✅", description: "Pengesahan anda telah direkodkan." });
+    toast({ title: "Terima kasih!", description: "Pengesahan anda telah direkodkan." });
   };
 
   const handleReviewSubmit = () => {
@@ -60,7 +60,7 @@ const MasjidDetail = () => {
       toast({ title: "Rating diperlukan", description: "Sila bagi rating bintang.", variant: "destructive" });
       return;
     }
-    toast({ title: "Review dihantar! ⭐", description: "Terima kasih atas sumbangan anda." });
+    toast({ title: "Review dihantar!", description: "Terima kasih atas sumbangan anda." });
     setReviewForm({ rating: 0, text: "", vibeTags: [] });
     setShowReviewForm(false);
   };
@@ -87,7 +87,7 @@ const MasjidDetail = () => {
     );
   }
 
-  const parkingLabel = { luas: "🅿️ Parking luas", terhad: "🅿️ Parking terhad", tiada: "🅿️ Tiada parking", "": "" };
+  const parkingLabel = { luas: "Parking luas", terhad: "Parking terhad", tiada: "Tiada parking", "": "" };
   const displayedReviews = showAllReviews ? masjid.reviews : masjid.reviews.slice(0, 2);
 
   return (
@@ -145,7 +145,7 @@ const MasjidDetail = () => {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {masjid.hasTerawih && (
                   <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <span>🌙</span>
+                    <Star className="h-4 w-4 text-primary" />
                     <div>
                       <p className="font-medium text-foreground">Terawih</p>
                       {masjid.terawihRakaat && <p className="text-xs text-muted-foreground">{masjid.terawihRakaat} rakaat</p>}
@@ -153,8 +153,8 @@ const MasjidDetail = () => {
                   </div>
                 )}
                 {masjid.hasIftar && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <span>🍽️</span>
+                   <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                     <Users className="h-4 w-4 text-primary" />
                     <div>
                       <p className="font-medium text-foreground">Iftar</p>
                       {masjid.iftarInfo && <p className="text-xs text-muted-foreground line-clamp-2">{masjid.iftarInfo}</p>}
@@ -171,8 +171,8 @@ const MasjidDetail = () => {
                   </div>
                 )}
                 {masjid.hasWomenSpace && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <span>🧕</span>
+                   <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                     <Users className="h-4 w-4 text-primary" />
                     <div>
                       <p className="font-medium text-foreground">Ruang Wanita</p>
                       {masjid.womenSpaceInfo && <p className="text-xs text-muted-foreground line-clamp-2">{masjid.womenSpaceInfo}</p>}
@@ -217,7 +217,7 @@ const MasjidDetail = () => {
                     className="rounded-lg text-xs"
                     onClick={() => setShowReviewForm(!showReviewForm)}
                   >
-                    ✍️ Tulis Review
+                    Tulis Review
                   </Button>
                 )}
               </div>
@@ -307,7 +307,7 @@ const MasjidDetail = () => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Belum ada review. Jadilah yang pertama! 🌟</p>
+                <p className="text-sm text-muted-foreground">Belum ada review. Jadilah yang pertama!</p>
               )}
 
               {!user && (
@@ -348,25 +348,25 @@ const MasjidDetail = () => {
             <div className="rounded-2xl border bg-card p-4 space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rekod Kunjungan</p>
               <Button onClick={() => handleTrack("Solat")} className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-5 text-sm">
-                🕌 Saya solat di sini
+                Saya solat di sini
               </Button>
               <Button onClick={() => handleTrack("Terawih")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                🌙 Terawih
+                Terawih
               </Button>
               <Button onClick={() => handleTrack("Iftar")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                🍽️ Iftar
+                Iftar
               </Button>
               <Button onClick={() => handleTrack("Jumaat")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                📿 Solat Jumaat
+                Solat Jumaat
               </Button>
               <Button onClick={() => handleTrack("Ziarah")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                📍 Ziarah
+                Ziarah
               </Button>
             </div>
 
             {!masjid.verified && (
               <Button onClick={handleVerify} variant="outline" className="w-full rounded-xl text-accent border-accent/30 hover:bg-accent/10 font-semibold py-6">
-                ✅ Sahkan masjid ini betul
+                Sahkan masjid ini betul
               </Button>
             )}
 

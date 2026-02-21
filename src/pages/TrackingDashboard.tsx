@@ -38,21 +38,21 @@ const TrackingDashboard = () => {
   });
 
   const typeLabel: Record<string, string> = {
-    terawih: "🌙 Terawih",
-    iftar: "🍽️ Iftar",
-    solat: "🕌 Solat",
-    jumaat: "📿 Jumaat",
-    ziarah: "📍 Ziarah",
+    terawih: "Terawih",
+    iftar: "Iftar",
+    solat: "Solat",
+    jumaat: "Jumaat",
+    ziarah: "Ziarah",
   };
 
   // Passport badges
   const badges = [
-    { name: "Pengembara", desc: "Lawat 5 masjid berbeza", unlocked: uniqueMasjids >= 5, icon: "🧭" },
-    { name: "Jelajah Negeri", desc: `Lawat masjid di 3 negeri (${visitedStates.size}/3)`, unlocked: visitedStates.size >= 3, icon: "🗺️" },
-    { name: "Setia", desc: `10 kunjungan (${totalVisits}/10)`, unlocked: totalVisits >= 10, icon: "⭐" },
-    { name: "Reviewer", desc: "Tulis 3 review", unlocked: false, icon: "✍️" },
-    { name: "Pengesah", desc: "Sahkan 5 masjid", unlocked: false, icon: "✅" },
-    { name: "Perintis", desc: "Tambah masjid pertama anda", unlocked: true, icon: "🏴" },
+    { name: "Pengembara", desc: "Lawat 5 masjid berbeza", unlocked: uniqueMasjids >= 5 },
+    { name: "Jelajah Negeri", desc: `Lawat masjid di 3 negeri (${visitedStates.size}/3)`, unlocked: visitedStates.size >= 3 },
+    { name: "Setia", desc: `10 kunjungan (${totalVisits}/10)`, unlocked: totalVisits >= 10 },
+    { name: "Reviewer", desc: "Tulis 3 review", unlocked: false },
+    { name: "Pengesah", desc: "Sahkan 5 masjid", unlocked: false },
+    { name: "Perintis", desc: "Tambah masjid pertama anda", unlocked: true },
   ];
 
   return (
@@ -65,7 +65,7 @@ const TrackingDashboard = () => {
             Jejak Saya
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Semua masjid yang anda dah kunjungi — passport masjid peribadi anda 🕌
+            Semua masjid yang anda dah kunjungi — passport masjid peribadi anda
           </p>
         </div>
 
@@ -101,7 +101,7 @@ const TrackingDashboard = () => {
                     : "bg-secondary/50 opacity-50"
                 }`}
               >
-                <span className="text-2xl">{badge.icon}</span>
+                <span className="text-sm font-bold text-primary">{badge.name.charAt(0)}</span>
                 <p className={`mt-1 text-sm font-semibold ${badge.unlocked ? "text-foreground" : "text-muted-foreground"}`}>
                   {badge.name}
                 </p>
@@ -127,7 +127,7 @@ const TrackingDashboard = () => {
                     : "bg-secondary text-muted-foreground"
                 }`}
               >
-                {visitedStates.has(state) ? "✅ " : ""}{state}
+                {state}
               </div>
             ))}
           </div>
@@ -152,7 +152,7 @@ const TrackingDashboard = () => {
             ))}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Hijau = ada kunjungan hari tu 🕌
+            Hijau = ada kunjungan hari tu
           </p>
         </div>
 
@@ -166,8 +166,8 @@ const TrackingDashboard = () => {
                 className="flex items-center justify-between rounded-xl border bg-background p-4 transition-colors hover:bg-secondary/50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-lg">
-                    {visit.type === "terawih" ? "🌙" : visit.type === "iftar" ? "🍽️" : visit.type === "jumaat" ? "📿" : visit.type === "ziarah" ? "📍" : "🕌"}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                    {visit.type.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p className="font-medium text-foreground text-sm">{visit.masjidName}</p>

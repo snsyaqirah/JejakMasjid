@@ -2,16 +2,16 @@ import { MasjidData } from "@/components/MasjidCard";
 
 // Available quick tags for filtering
 export const QUICK_TAGS = [
-  { key: "mesra-oku", label: "♿ Mesra OKU", emoji: "♿" },
-  { key: "ruang-wanita", label: "🧕 Ruang Wanita", emoji: "🧕" },
-  { key: "parking-luas", label: "🅿️ Parking Luas", emoji: "🅿️" },
-  { key: "public-transport", label: "🚇 Dekat Transit", emoji: "🚇" },
-  { key: "wifi", label: "📶 WiFi", emoji: "📶" },
-  { key: "ac", label: "❄️ Aircon", emoji: "❄️" },
-  { key: "iftar", label: "🍽️ Iftar", emoji: "🍽️" },
-  { key: "terawih", label: "🌙 Terawih", emoji: "🌙" },
-  { key: "kuliah", label: "📖 Kuliah/Ceramah", emoji: "📖" },
-  { key: "tandas-bersih", label: "🚿 Tandas Bersih", emoji: "🚿" },
+  { key: "mesra-oku", label: "Mesra OKU" },
+  { key: "ruang-wanita", label: "Ruang Wanita" },
+  { key: "parking-luas", label: "Parking Luas" },
+  { key: "public-transport", label: "Dekat Transit" },
+  { key: "wifi", label: "WiFi" },
+  { key: "ac", label: "Aircon" },
+  { key: "iftar", label: "Iftar" },
+  { key: "terawih", label: "Terawih" },
+  { key: "kuliah", label: "Kuliah/Ceramah" },
+  { key: "tandas-bersih", label: "Tandas Bersih" },
 ] as const;
 
 export const VIBE_TAGS = [

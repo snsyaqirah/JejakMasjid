@@ -29,7 +29,7 @@ const Index = () => {
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent/20 px-4 py-1.5 text-sm font-medium text-primary-foreground backdrop-blur-sm">
               <Compass className="h-4 w-4" />
-              <span>Jejak. Kongsi. Temui. 🕌</span>
+              <span>Jejak. Kongsi. Temui.</span>
             </div>
 
             <h1 className="font-serif text-4xl font-bold leading-tight text-primary-foreground md:text-6xl animate-fade-in-up">
