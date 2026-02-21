@@ -1,6 +1,8 @@
-import { MapPin, CheckCircle, Users } from "lucide-react";
+import { MapPin, CheckCircle, Users, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { QUICK_TAGS } from "@/data/mockData";
+import type { Review } from "@/data/mockData";
 
 export interface MasjidData {
   id: string;
@@ -13,9 +15,24 @@ export interface MasjidData {
   totalVisits: number;
   hasIftar: boolean;
   hasTerawih: boolean;
+  terawihRakaat?: number;
+  iftarInfo?: string;
+  nearPublicTransport: boolean;
+  parkingStatus: "luas" | "terhad" | "tiada" | "";
+  hasOKUAccess: boolean;
+  hasWomenSpace: boolean;
+  womenSpaceInfo?: string;
+  hasAC: boolean;
+  hasWifi: boolean;
+  tags: string[];
+  averageRating: number;
+  reviews: Review[];
 }
 
 const MasjidCard = ({ masjid }: { masjid: MasjidData }) => {
+  // Show up to 3 top tags
+  const topTags = masjid.tags.slice(0, 3).map((t) => QUICK_TAGS.find((qt) => qt.key === t)).filter(Boolean);
+
   return (
     <Link
       to={`/masjid/${masjid.id}`}
@@ -51,18 +68,13 @@ const MasjidCard = ({ masjid }: { masjid: MasjidData }) => {
           </div>
         )}
 
-        {/* Tags */}
-        <div className="absolute bottom-3 left-3 flex gap-1.5">
-          {masjid.hasTerawih && (
-            <Badge variant="secondary" className="bg-primary/90 text-primary-foreground font-sans text-xs backdrop-blur-sm">
-              🌙 Terawih
+        {/* Quick Tags */}
+        <div className="absolute bottom-3 left-3 flex gap-1.5 flex-wrap">
+          {topTags.map((tag) => tag && (
+            <Badge key={tag.key} variant="secondary" className="bg-primary/90 text-primary-foreground font-sans text-xs backdrop-blur-sm">
+              {tag.emoji} {tag.label.split(" ").slice(1).join(" ")}
             </Badge>
-          )}
-          {masjid.hasIftar && (
-            <Badge variant="secondary" className="bg-primary/90 text-primary-foreground font-sans text-xs backdrop-blur-sm">
-              🍽️ Iftar
-            </Badge>
-          )}
+          ))}
         </div>
       </div>
 
@@ -75,13 +87,20 @@ const MasjidCard = ({ masjid }: { masjid: MasjidData }) => {
           <MapPin className="h-3.5 w-3.5" />
           {masjid.location}, {masjid.state}
         </p>
-        <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" />
-            {masjid.totalVisits} kunjungan
-          </span>
-          <span>•</span>
-          <span>{masjid.verificationCount}/3 pengesahan</span>
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Users className="h-3.5 w-3.5" />
+              {masjid.totalVisits} kunjungan
+            </span>
+          </div>
+          {masjid.averageRating > 0 && (
+            <div className="flex items-center gap-1 text-xs font-semibold text-accent">
+              <Star className="h-3.5 w-3.5 fill-current" />
+              {masjid.averageRating.toFixed(1)}
+              <span className="text-muted-foreground font-normal">({masjid.reviews.length})</span>
+            </div>
+          )}
         </div>
       </div>
     </Link>

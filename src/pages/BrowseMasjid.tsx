@@ -1,77 +1,106 @@
 import { useState } from "react";
-import { Search, Filter, MapPin } from "lucide-react";
+import { Search, MapPin, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MasjidCard from "@/components/MasjidCard";
-import { mockMasjids } from "@/data/mockData";
+import { mockMasjids, QUICK_TAGS } from "@/data/mockData";
 import { Link } from "react-router-dom";
 
 const BrowseMasjid = () => {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "verified" | "terawih" | "iftar">("all");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<"visits" | "rating">("visits");
 
-  const filtered = mockMasjids.filter((m) => {
-    const matchSearch =
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.location.toLowerCase().includes(search.toLowerCase());
-    if (filter === "verified") return matchSearch && m.verified;
-    if (filter === "terawih") return matchSearch && m.hasTerawih;
-    if (filter === "iftar") return matchSearch && m.hasIftar;
-    return matchSearch;
-  });
+  const toggleTag = (key: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]
+    );
+  };
 
-  const filters = [
-    { key: "all" as const, label: "Semua" },
-    { key: "verified" as const, label: "Disahkan" },
-    { key: "terawih" as const, label: "🌙 Terawih" },
-    { key: "iftar" as const, label: "🍽️ Iftar" },
-  ];
+  const filtered = mockMasjids
+    .filter((m) => {
+      const matchSearch =
+        m.name.toLowerCase().includes(search.toLowerCase()) ||
+        m.location.toLowerCase().includes(search.toLowerCase()) ||
+        m.state.toLowerCase().includes(search.toLowerCase());
+      const matchTags =
+        selectedTags.length === 0 || selectedTags.every((t) => m.tags.includes(t));
+      return matchSearch && matchTags;
+    })
+    .sort((a, b) =>
+      sortBy === "rating"
+        ? b.averageRating - a.averageRating
+        : b.totalVisits - a.totalVisits
+    );
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Page Header */}
         <div className="mb-8">
           <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
             Cari Masjid
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Temui masjid berdekatan yang dikongsi oleh komuniti
+            Temui masjid berdekatan — filter ikut kemudahan yang anda perlukan
           </p>
         </div>
 
-        {/* Search + Filters */}
-        <div className="mb-8 space-y-4">
+        {/* Search */}
+        <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Cari nama masjid atau lokasi..."
+              placeholder="Cari nama masjid, lokasi, atau negeri..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="rounded-xl pl-11 py-6 text-base bg-card"
             />
           </div>
+        </div>
 
+        {/* Quick Tags Filter */}
+        <div className="mb-4">
+          <p className="text-sm font-medium text-muted-foreground mb-2">Filter kemudahan:</p>
           <div className="flex flex-wrap gap-2">
-            {filters.map((f) => (
+            {QUICK_TAGS.map((tag) => (
               <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  filter === f.key
+                key={tag.key}
+                onClick={() => toggleTag(tag.key)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  selectedTags.includes(tag.key)
                     ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                 }`}
               >
-                {f.label}
+                {tag.label}
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Sort */}
+        <div className="mb-6 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Susun:</span>
+          <button
+            onClick={() => setSortBy("visits")}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              sortBy === "visits" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            Paling Dikunjungi
+          </button>
+          <button
+            onClick={() => setSortBy("rating")}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${
+              sortBy === "rating" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            <Star className="h-3 w-3" /> Rating Tertinggi
+          </button>
         </div>
 
         {/* Results */}

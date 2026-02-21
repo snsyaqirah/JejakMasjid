@@ -1,4 +1,4 @@
-import { Moon, MapPin, Heart } from "lucide-react";
+import { Moon, MapPin, Heart, Compass } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -7,12 +7,12 @@ const Footer = () => {
         <div className="grid gap-8 md:grid-cols-3">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Moon className="h-5 w-5" />
+              <Compass className="h-5 w-5" />
               <span className="font-serif text-xl font-bold">JejakMasjid</span>
             </div>
             <p className="text-sm opacity-80 leading-relaxed">
-              Jejaki perjalanan ibadah anda. Dari terawih ke iftar, 
-              setiap langkah ke masjid adalah satu jejak bermakna.
+              Jejaki setiap masjid yang anda kunjungi. Kongsi review, 
+              temui masjid terbaik, dan bina komuniti bersama.
             </p>
           </div>
 
@@ -28,8 +28,8 @@ const Footer = () => {
           <div>
             <h4 className="font-serif text-lg font-semibold mb-3">Komuniti</h4>
             <p className="text-sm opacity-80 leading-relaxed">
-              Dibina dengan kasih sayang untuk umat. 
-              Setiap sumbangan masjid baru menguatkan komuniti kita.
+              Dibina untuk umat, oleh umat. 
+              Setiap review dan sumbangan menguatkan komuniti kita.
             </p>
           </div>
         </div>

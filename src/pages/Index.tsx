@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MapPin, Moon, Star, ArrowRight, Users } from "lucide-react";
+import { MapPin, Moon, Star, ArrowRight, Users, Compass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -8,7 +8,7 @@ import { mockMasjids } from "@/data/mockData";
 import heroImage from "@/assets/hero-mosque.jpg";
 
 const Index = () => {
-  const featuredMasjids = mockMasjids.slice(0, 3);
+  const featuredMasjids = mockMasjids.filter((m) => m.verified).slice(0, 3);
 
   return (
     <div className="min-h-screen bg-background">
@@ -19,7 +19,7 @@ const Index = () => {
         <div className="absolute inset-0">
           <img
             src={heroImage}
-            alt="Masjid yang indah ketika senja"
+            alt="Masjid yang indah"
             className="h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/70 to-primary/40" />
@@ -28,19 +28,21 @@ const Index = () => {
         <div className="relative container mx-auto px-4 py-24 md:py-36">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent/20 px-4 py-1.5 text-sm font-medium text-primary-foreground backdrop-blur-sm">
-              <Moon className="h-4 w-4" />
-              <span>Ramadan Kareem 🌙</span>
+              <Compass className="h-4 w-4" />
+              <span>Jejak. Kongsi. Temui. 🕌</span>
             </div>
 
             <h1 className="font-serif text-4xl font-bold leading-tight text-primary-foreground md:text-6xl animate-fade-in-up">
-              Jejaki perjalanan
+              Jejaki setiap
               <br />
-              <span className="text-accent">ibadah</span> anda
+              <span className="text-accent">masjid</span> yang
+              <br />
+              anda kunjungi
             </h1>
 
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-primary-foreground/80 animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
-              Dari terawih ke iftar, setiap langkah ke masjid adalah satu jejak bermakna. 
-              Kongsi dan temui masjid bersama komuniti.
+              Rekod masjid yang anda singgah, kongsi review dengan komuniti,
+              dan temui masjid terbaik berdekatan anda.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
@@ -86,7 +88,7 @@ const Index = () => {
             Macam mana ia berfungsi?
           </h2>
           <p className="mt-3 text-muted-foreground max-w-md mx-auto">
-            Tiga langkah mudah untuk mula menjejaki perjalanan ibadah anda
+            Tiga langkah mudah untuk mula menjejaki masjid anda
           </p>
         </div>
 
@@ -95,19 +97,19 @@ const Index = () => {
             {
               icon: MapPin,
               title: "Cari atau Tambah",
-              description: "Cari masjid berdekatan atau tambah masjid baru yang anda kunjungi.",
+              description: "Cari masjid berdekatan atau tambah masjid baru yang anda kunjungi. Lengkapkan info fasiliti untuk bantu orang lain.",
               step: "01",
             },
             {
               icon: Star,
-              title: "Rekod Kunjungan",
-              description: "Rekodkan terawih, iftar, atau solat yang anda tunaikan di masjid tersebut.",
+              title: "Review & Rekod",
+              description: "Bagi rating, tulis review ringkas, dan tag vibe masjid tu. Bantu orang lain pilih masjid terbaik.",
               step: "02",
             },
             {
               icon: Users,
               title: "Sahkan & Kongsi",
-              description: "Bantu sahkan masjid yang orang lain tambah. 3 pengesahan = Disahkan!",
+              description: "Sahkan info masjid yang orang lain tambah. 3 pengesahan = Disahkan oleh komuniti!",
               step: "03",
             },
           ].map((item) => (
@@ -129,10 +131,10 @@ const Index = () => {
           <div className="flex items-end justify-between mb-10">
             <div>
               <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
-                Masjid Pilihan
+                Masjid Popular
               </h2>
               <p className="mt-2 text-muted-foreground">
-                Masjid popular yang dikunjungi komuniti
+                Paling banyak dikunjungi dan highest rated oleh komuniti
               </p>
             </div>
             <Button asChild variant="ghost" className="text-primary font-semibold">
@@ -154,12 +156,12 @@ const Index = () => {
       {/* CTA */}
       <section className="container mx-auto px-4 py-16 md:py-24 text-center">
         <div className="mx-auto max-w-lg rounded-2xl border bg-card p-8 md:p-12">
-          <Moon className="mx-auto h-10 w-10 text-accent mb-4" />
+          <Compass className="mx-auto h-10 w-10 text-accent mb-4" />
           <h2 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
-            Belum ada rekod terawih lagi?
+            Masjid mana anda dah singgah?
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Jom ke masjid! Mula jejaki perjalanan Ramadan anda hari ini.
+            Mula rekod kunjungan masjid anda dan kongsi pengalaman dengan komuniti.
           </p>
           <Button asChild size="lg" className="mt-6 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-8">
             <Link to="/browse">
