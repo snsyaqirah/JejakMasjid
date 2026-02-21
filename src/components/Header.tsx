@@ -1,17 +1,22 @@
 import { Link, useLocation } from "react-router-dom";
-import { MapPin, Moon, Menu, X } from "lucide-react";
+import { Moon, Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const links = [
     { to: "/", label: "Utama" },
     { to: "/browse", label: "Cari Masjid" },
-    { to: "/tracking", label: "Jejak Saya" },
-    { to: "/add", label: "Tambah Masjid" },
+    ...(user ? [
+      { to: "/tracking", label: "Jejak Saya" },
+      { to: "/add", label: "Tambah Masjid" },
+    ] : []),
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -43,6 +48,32 @@ const Header = () => {
               {link.label}
             </Link>
           ))}
+
+          {user ? (
+            <div className="ml-3 flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                  {user.displayName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium text-foreground">{user.displayName}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button asChild variant="outline" size="sm" className="ml-3 rounded-lg">
+              <Link to="/auth">
+                <LogIn className="mr-1.5 h-4 w-4" />
+                Log Masuk
+              </Link>
+            </Button>
+          )}
         </nav>
 
         {/* Mobile Toggle */}
@@ -71,6 +102,36 @@ const Header = () => {
               {link.label}
             </Link>
           ))}
+
+          {user ? (
+            <div className="mt-2 flex items-center justify-between rounded-lg px-4 py-3 border-t">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                    {user.displayName.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-medium">{user.displayName}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { logout(); setMobileOpen(false); }}
+                className="text-muted-foreground"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                Keluar
+              </Button>
+            </div>
+          ) : (
+            <Link
+              to="/auth"
+              onClick={() => setMobileOpen(false)}
+              className="mt-2 block rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground text-center"
+            >
+              Log Masuk / Daftar
+            </Link>
+          )}
         </nav>
       )}
     </header>

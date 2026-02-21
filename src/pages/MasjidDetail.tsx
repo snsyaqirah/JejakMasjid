@@ -1,14 +1,42 @@
-import { useParams, Link } from "react-router-dom";
-import { MapPin, CheckCircle, ArrowLeft, Users, Calendar, Clock } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { MapPin, CheckCircle, ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { mockMasjids } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const MasjidDetail = () => {
   const { id } = useParams();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const masjid = mockMasjids.find((m) => m.id === id);
+
+  const requireLogin = (action: string) => {
+    if (!user) {
+      toast({
+        title: "Log masuk diperlukan",
+        description: `Sila log masuk untuk ${action}.`,
+        variant: "destructive",
+      });
+      navigate("/auth");
+      return true;
+    }
+    return false;
+  };
+
+  const handleTrack = (type: string) => {
+    if (requireLogin(`merekod ${type}`)) return;
+    toast({ title: `${type} direkodkan! 🌙`, description: `Kunjungan anda ke ${masjid?.name} telah disimpan.` });
+  };
+
+  const handleVerify = () => {
+    if (requireLogin("mengesahkan masjid")) return;
+    toast({ title: "Terima kasih! ✅", description: "Pengesahan anda telah direkodkan." });
+  };
 
   if (!masjid) {
     return (
@@ -38,7 +66,6 @@ const MasjidDetail = () => {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Image */}
             <div className="h-64 md:h-80 rounded-2xl overflow-hidden bg-secondary flex items-center justify-center">
               {masjid.image ? (
                 <img src={masjid.image} alt={masjid.name} className="h-full w-full object-cover" />
@@ -50,7 +77,6 @@ const MasjidDetail = () => {
               )}
             </div>
 
-            {/* Info */}
             <div>
               <div className="flex items-start gap-3 flex-wrap">
                 <h1 className="font-serif text-3xl font-bold text-foreground">{masjid.name}</h1>
@@ -65,14 +91,12 @@ const MasjidDetail = () => {
                   </Badge>
                 )}
               </div>
-
               <p className="mt-2 flex items-center gap-1.5 text-muted-foreground">
                 <MapPin className="h-4 w-4" />
                 {masjid.location}, {masjid.state}
               </p>
             </div>
 
-            {/* Tags */}
             <div className="flex gap-2">
               {masjid.hasTerawih && (
                 <Badge variant="secondary" className="rounded-full px-4 py-2 text-sm bg-primary/10 text-primary">
@@ -86,11 +110,10 @@ const MasjidDetail = () => {
               )}
             </div>
 
-            {/* Description placeholder */}
             <div className="rounded-2xl border bg-card p-6">
               <h3 className="font-serif text-lg font-semibold mb-3">Tentang Masjid</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Maklumat lanjut tentang masjid ini belum ditambah lagi. Anda boleh membantu 
+                Maklumat lanjut tentang masjid ini belum ditambah lagi. Anda boleh membantu
                 melengkapkan maklumat ini jika anda pernah mengunjungi masjid ini.
               </p>
             </div>
@@ -122,17 +145,35 @@ const MasjidDetail = () => {
               </div>
             </div>
 
-            <Button className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-6">
+            <Button
+              onClick={() => handleTrack("Terawih")}
+              className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-6"
+            >
               🌙 Saya di sini untuk Terawih
             </Button>
-            <Button variant="outline" className="w-full rounded-xl font-semibold py-6">
+            <Button
+              onClick={() => handleTrack("Iftar")}
+              variant="outline"
+              className="w-full rounded-xl font-semibold py-6"
+            >
               🍽️ Saya di sini untuk Iftar
             </Button>
 
             {!masjid.verified && (
-              <Button variant="outline" className="w-full rounded-xl text-accent border-accent/30 hover:bg-accent/10 font-semibold py-6">
+              <Button
+                onClick={handleVerify}
+                variant="outline"
+                className="w-full rounded-xl text-accent border-accent/30 hover:bg-accent/10 font-semibold py-6"
+              >
                 ✅ Sahkan masjid ini betul
               </Button>
+            )}
+
+            {!user && (
+              <p className="text-center text-xs text-muted-foreground">
+                <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}
+                untuk merekod kunjungan dan mengesahkan masjid
+              </p>
             )}
           </div>
         </div>

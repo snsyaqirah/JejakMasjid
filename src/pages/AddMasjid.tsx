@@ -7,11 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AddMasjid = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [form, setForm] = useState({
     name: "",
     location: "",
@@ -20,6 +22,8 @@ const AddMasjid = () => {
     hasTerawih: false,
     hasIftar: false,
   });
+
+  if (!user) return <Navigate to="/auth" replace />;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
