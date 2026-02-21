@@ -1,12 +1,176 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Link } from "react-router-dom";
+import { MapPin, Moon, Star, ArrowRight, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import MasjidCard from "@/components/MasjidCard";
+import { mockMasjids } from "@/data/mockData";
+import heroImage from "@/assets/hero-mosque.jpg";
 
 const Index = () => {
+  const featuredMasjids = mockMasjids.slice(0, 3);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <img
+            src={heroImage}
+            alt="Masjid yang indah ketika senja"
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/70 to-primary/40" />
+        </div>
+
+        <div className="relative container mx-auto px-4 py-24 md:py-36">
+          <div className="max-w-2xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent/20 px-4 py-1.5 text-sm font-medium text-primary-foreground backdrop-blur-sm">
+              <Moon className="h-4 w-4" />
+              <span>Ramadan Kareem 🌙</span>
+            </div>
+
+            <h1 className="font-serif text-4xl font-bold leading-tight text-primary-foreground md:text-6xl animate-fade-in-up">
+              Jejaki perjalanan
+              <br />
+              <span className="text-accent">ibadah</span> anda
+            </h1>
+
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-primary-foreground/80 animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
+              Dari terawih ke iftar, setiap langkah ke masjid adalah satu jejak bermakna. 
+              Kongsi dan temui masjid bersama komuniti.
+            </p>
+
+            <div className="mt-8 flex flex-wrap gap-3 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+              <Button asChild size="lg" className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-semibold text-base px-8">
+                <Link to="/browse">
+                  <MapPin className="mr-2 h-5 w-5" />
+                  Cari Masjid
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="rounded-xl border-primary-foreground/50 text-primary-foreground bg-primary-foreground/10 hover:bg-primary-foreground/20 font-semibold text-base px-8">
+                <Link to="/tracking">
+                  Jejak Saya
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="border-b bg-card islamic-pattern">
+        <div className="container mx-auto grid grid-cols-3 gap-4 px-4 py-8 text-center">
+          <div>
+            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">6</p>
+            <p className="mt-1 text-xs text-muted-foreground md:text-sm">Masjid Didaftarkan</p>
+          </div>
+          <div>
+            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">580+</p>
+            <p className="mt-1 text-xs text-muted-foreground md:text-sm">Kunjungan Direkodkan</p>
+          </div>
+          <div>
+            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">4</p>
+            <p className="mt-1 text-xs text-muted-foreground md:text-sm">Masjid Disahkan</p>
+          </div>
+        </div>
+      </section>
+
+      {/* How it Works */}
+      <section className="container mx-auto px-4 py-16 md:py-24">
+        <div className="text-center mb-12">
+          <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
+            Macam mana ia berfungsi?
+          </h2>
+          <p className="mt-3 text-muted-foreground max-w-md mx-auto">
+            Tiga langkah mudah untuk mula menjejaki perjalanan ibadah anda
+          </p>
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-3">
+          {[
+            {
+              icon: MapPin,
+              title: "Cari atau Tambah",
+              description: "Cari masjid berdekatan atau tambah masjid baru yang anda kunjungi.",
+              step: "01",
+            },
+            {
+              icon: Star,
+              title: "Rekod Kunjungan",
+              description: "Rekodkan terawih, iftar, atau solat yang anda tunaikan di masjid tersebut.",
+              step: "02",
+            },
+            {
+              icon: Users,
+              title: "Sahkan & Kongsi",
+              description: "Bantu sahkan masjid yang orang lain tambah. 3 pengesahan = Disahkan!",
+              step: "03",
+            },
+          ].map((item) => (
+            <div key={item.step} className="group rounded-2xl border bg-card p-6 text-center transition-all hover:shadow-md hover:-translate-y-1">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
+                <item.icon className="h-7 w-7 text-primary" />
+              </div>
+              <span className="text-xs font-bold text-accent">{item.step}</span>
+              <h3 className="mt-2 font-serif text-xl font-semibold text-foreground">{item.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Featured Masjids */}
+      <section className="bg-secondary/50 islamic-pattern">
+        <div className="container mx-auto px-4 py-16 md:py-24">
+          <div className="flex items-end justify-between mb-10">
+            <div>
+              <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
+                Masjid Pilihan
+              </h2>
+              <p className="mt-2 text-muted-foreground">
+                Masjid popular yang dikunjungi komuniti
+              </p>
+            </div>
+            <Button asChild variant="ghost" className="text-primary font-semibold">
+              <Link to="/browse">
+                Lihat semua
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {featuredMasjids.map((masjid) => (
+              <MasjidCard key={masjid.id} masjid={masjid} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="container mx-auto px-4 py-16 md:py-24 text-center">
+        <div className="mx-auto max-w-lg rounded-2xl border bg-card p-8 md:p-12">
+          <Moon className="mx-auto h-10 w-10 text-accent mb-4" />
+          <h2 className="font-serif text-2xl font-bold text-foreground md:text-3xl">
+            Belum ada rekod terawih lagi?
+          </h2>
+          <p className="mt-3 text-muted-foreground">
+            Jom ke masjid! Mula jejaki perjalanan Ramadan anda hari ini.
+          </p>
+          <Button asChild size="lg" className="mt-6 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-8">
+            <Link to="/browse">
+              Mula Sekarang
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      <Footer />
     </div>
   );
 };
