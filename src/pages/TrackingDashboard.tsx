@@ -1,10 +1,15 @@
 import { Moon, Calendar, MapPin, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { mockVisits, mockMasjids } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
+import { Link, Navigate } from "react-router-dom";
 
 const TrackingDashboard = () => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/auth" replace />;
   const terawihCount = mockVisits.filter((v) => v.type === "terawih").length;
   const iftarCount = mockVisits.filter((v) => v.type === "iftar").length;
   const uniqueMasjids = new Set(mockVisits.map((v) => v.masjidId)).size;
