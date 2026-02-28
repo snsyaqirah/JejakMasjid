@@ -131,3 +131,56 @@
   background-size: 200% auto;
   animation: gold-shimmer 3s linear infinite;
 }
+
+/* ── Card elevation system ─────────────────────────────────────────────────── */
+.card-flat    { @apply bg-card border border-border rounded-2xl; }
+.card-raised  { @apply bg-card border border-border rounded-2xl shadow-[0_2px_16px_-4px_hsl(var(--primary)/0.10)]; }
+.card-float   { @apply bg-card border border-border rounded-2xl shadow-[0_8px_32px_-8px_hsl(var(--primary)/0.18)] hover:shadow-[0_12px_40px_-8px_hsl(var(--primary)/0.22)] transition-shadow duration-300; }
+
+/* ── Status pill badges ────────────────────────────────────────────────────── */
+.badge-verified   { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20; }
+.badge-unverified { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border; }
+.badge-rejected   { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20; }
+
+/* ── Prayer type pill ──────────────────────────────────────────────────────── */
+.prayer-pill { @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary; }
+
+/* ── Section headings ──────────────────────────────────────────────────────── */
+.section-label {
+  @apply text-xs font-semibold tracking-widest uppercase text-muted-foreground;
+}
+.display-heading {
+  @apply font-serif text-4xl md:text-5xl lg:text-6xl font-semibold leading-tight tracking-tight text-foreground;
+}
+
+/* ── Masjid map pin pulse ───────────────────────────────────────────────────── */
+@keyframes map-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.15); opacity: 0.7; }
+}
+.map-pin-pulse { animation: map-pulse 2s ease-in-out infinite; }
+
+/* ── Verified badge glow ───────────────────────────────────────────────────── */
+.verified-glow {
+  box-shadow: 0 0 0 2px hsl(var(--primary)/0.15), 0 0 12px hsl(var(--primary)/0.12);
+}
+
+/* ── Scroll snap carousel (masjid images) ──────────────────────────────────── */
+.snap-gallery         { @apply flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2; scroll-padding: 0; }
+.snap-gallery > *     { @apply snap-start flex-none; }
+
+/* ── Smooth page transitions ────────────────────────────────────────────────── */
+.page-enter { @apply animate-fade-in-up; }
+
+/* ── Focus ring override (accessible + on-brand) ───────────────────────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Scrollbar (webkit) ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: hsl(var(--muted)); border-radius: 99px; }
+::-webkit-scrollbar-thumb  { background: hsl(var(--primary)/0.4); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary)/0.7); }
