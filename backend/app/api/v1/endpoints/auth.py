@@ -2,6 +2,7 @@
 Authentication endpoints using Supabase Auth.
 Handles signup, login, OTP verification, and token refresh.
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 from app.core.supabase import get_supabase
@@ -15,6 +16,7 @@ from app.schemas.auth import (
 from app.schemas.common import MessageResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/signup", response_model=SignUpResponse, status_code=201)
@@ -45,6 +47,17 @@ async def sign_up(
                 detail="Failed to create user. Email may already exist."
             )
         
+        # When "Confirm email" is OFF, Supabase returns a session immediately
+        if response.session:
+            return SignUpResponse(
+                message="Account created successfully!",
+                email=body.email,
+                user_id=str(response.user.id),
+                access_token=response.session.access_token,
+                refresh_token=response.session.refresh_token,
+                user=response.user.model_dump() if response.user else {}
+            )
+
         return SignUpResponse(
             message="Verification code sent to your email. Check your inbox!",
             email=body.email,
@@ -52,6 +65,7 @@ async def sign_up(
         )
         
     except Exception as e:
+        logger.error("Signup error: %s | type: %s", str(e), type(e).__name__, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)

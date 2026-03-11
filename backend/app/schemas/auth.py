@@ -15,17 +15,20 @@ class SignUpRequest(CamelModel):
 
 
 class SignUpResponse(CamelModel):
-    """Response after signup - user must verify email."""
+    """Response after signup. May include session if email confirmation is disabled."""
     message: str = "Verification code sent to your email"
     email: str
     user_id: str
+    access_token: str | None = None
+    refresh_token: str | None = None
+    user: dict | None = None
 
 
 # ── OTP Verification ────────────────────────────────────────────────
 class VerifyOTPRequest(CamelModel):
-    """6-digit OTP code verification."""
+    """OTP code verification."""
     email: EmailStr
-    token: str = Field(min_length=6, max_length=6, description="6-digit code")
+    token: str = Field(min_length=6, max_length=8, description="6 or 8 digit code")
 
 
 class VerifyOTPResponse(CamelModel):

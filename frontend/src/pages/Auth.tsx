@@ -29,7 +29,7 @@ const Auth = () => {
     try {
       const data = await authApi.login({ email, password });
       authenticate(data.user as { id: string; email: string; user_metadata: Record<string, unknown> });
-      toast({ title: "Selamat datang! í¼™", description: "Anda berjaya log masuk." });
+      toast({ title: "Selamat datang! ï¿½ï¿½ï¿½", description: "Anda berjaya log masuk." });
       navigate("/");
     } catch (err) {
       const msg = err instanceof ApiError && err.status === 403
@@ -49,12 +49,19 @@ const Auth = () => {
     }
     setLoading(true);
     try {
-      await authApi.signup({ email, password, fullName });
-      toast({
-        title: "Kod pengesahan dihantar! í³§",
-        description: `Semak inbox ${email} untuk kod 6 digit anda.`,
-      });
-      setStep("otp");
+      const data = await authApi.signup({ email, password, fullName });
+      if (data.accessToken && data.user) {
+        // Email confirm is OFF â€” user is auto-confirmed, log in immediately
+        authenticate(data.user as { id: string; email: string; user_metadata: Record<string, unknown> });
+        toast({ title: "Akaun berjaya didaftarkan! ðŸŽ‰", description: "Selamat datang ke JejakMasjid." });
+        navigate("/");
+      } else {
+        toast({
+          title: "Kod pengesahan dihantar!",
+          description: `Semak inbox ${email} untuk kod anda.`,
+        });
+        setStep("otp");
+      }
     } catch (err) {
       toast({
         title: "Pendaftaran gagal",
@@ -68,15 +75,15 @@ const Auth = () => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode.length !== 6) {
-      toast({ title: "Kod tidak sah", description: "Masukkan 6 digit kod pengesahan.", variant: "destructive" });
+    if (otpCode.length < 6) {
+      toast({ title: "Kod tidak sah", description: "Masukkan kod pengesahan dari email anda.", variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
       const data = await authApi.verifyOtp({ email, token: otpCode });
       authenticate(data.user as { id: string; email: string; user_metadata: Record<string, unknown> });
-      toast({ title: "Akaun berjaya disahkan! í¾‰", description: "Selamat datang ke JejakMasjid." });
+      toast({ title: "Akaun berjaya disahkan! ï¿½ï¿½ï¿½", description: "Selamat datang ke JejakMasjid." });
       navigate("/");
     } catch (err) {
       toast({
@@ -130,7 +137,7 @@ const Auth = () => {
                   </div>
                   <h2 className="text-lg font-semibold">Sahkan Email</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Kami hantar kod 6 digit ke <strong>{email}</strong>
+                    Kami hantar kod ke <strong>{email}</strong>
                   </p>
                 </div>
                 <form onSubmit={handleVerifyOtp} className="space-y-4">
@@ -139,14 +146,14 @@ const Auth = () => {
                     <Input
                       id="otp"
                       value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      placeholder="123456"
-                      maxLength={6}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                      placeholder="12345678"
+                      maxLength={8}
                       className="mt-1.5 text-center text-2xl tracking-widest font-mono"
                       autoFocus
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || otpCode.length !== 6}>
+                  <Button type="submit" className="w-full" disabled={loading || otpCode.length < 6}>
                     {loading ? "Mengesahkan..." : "Sahkan"}
                   </Button>
                 </form>

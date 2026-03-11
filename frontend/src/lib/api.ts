@@ -80,7 +80,14 @@ export const authApi = {
     fullName: string;
     phoneNumber?: string;
   }) =>
-    request<{ message: string; email: string; userId: string }>(
+    request<{
+      message: string;
+      email: string;
+      userId: string;
+      accessToken?: string;
+      refreshToken?: string;
+      user?: Record<string, unknown>;
+    }>(
       "/api/v1/auth/signup",
       { method: "POST", body: JSON.stringify(body) }
     ),
