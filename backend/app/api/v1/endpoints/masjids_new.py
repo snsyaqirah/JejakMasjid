@@ -2,6 +2,7 @@
 Masjid CRUD endpoints with 100m radius duplicate check and facilities management.
 """
 import uuid
+import struct
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import Client
 from app.core.supabase import get_supabase, get_supabase_admin
@@ -16,12 +17,25 @@ from app.schemas.common import MessageResponse, PaginatedResponse
 router = APIRouter()
 
 
+def parse_ewkb_point(hex_str: str) -> tuple[float, float]:
+    """Parse PostGIS EWKB hex string to (longitude, latitude)."""
+    data = bytes.fromhex(hex_str)
+    byte_order = data[0]
+    endian = '<' if byte_order == 1 else '>'
+    # geom_type is 4 bytes; check bit 0x20000000 for SRID presence
+    geom_type = struct.unpack_from(f'{endian}I', data, 1)[0]
+    has_srid = bool(geom_type & 0x20000000)
+    offset = 1 + 4 + (4 if has_srid else 0)  # byte_order + type + optional SRID
+    lng, lat = struct.unpack_from(f'{endian}dd', data, offset)
+    return lng, lat
+
+
 # ── Nearby Search (100m Radius Check) ────────────────────────────────
 
 @router.post("/check-nearby", response_model=list[NearbyMasjidResult])
 async def check_nearby_masjids(
     body: NearbySearchRequest,
-    supabase: Client = Depends(get_supabase)
+    supabase: Client = Depends(get_supabase_admin)
 ):
     """
     CHECK BEFORE CREATING: Find masjids within radius (default 100m).
@@ -55,7 +69,7 @@ async def list_masjids(
     page_size: int = Query(20, ge=1, le=100),
     status_filter: str | None = Query(None, alias="status"),
     search: str | None = None,
-    supabase: Client = Depends(get_supabase)
+    supabase: Client = Depends(get_supabase_admin)
 ):
     """
     List all masjids with pagination and filtering.
@@ -103,7 +117,7 @@ async def list_masjids(
 async def get_masjid_detail(
     masjid_id: uuid.UUID,
     current_user: dict | None = Depends(get_current_user_optional),
-    supabase: Client = Depends(get_supabase)
+    supabase: Client = Depends(get_supabase_admin)
 ):
     """
     Get full masjid details including facilities, media, and live status.
@@ -126,15 +140,47 @@ async def get_masjid_detail(
             )
         
         masjid = result.data[0]
-        
-        # Get live updates (active only)
+
+        # Parse lat/lng from PostGIS EWKB hex
+        try:
+            lng, lat = parse_ewkb_point(masjid['location'])
+        except Exception:
+            lng, lat = 0.0, 0.0
+
+        # facilities join returns a list — take first item or None
+        raw_facilities = masjid.get('facilities')
+        facilities = raw_facilities[0] if isinstance(raw_facilities, list) and raw_facilities else (
+            raw_facilities if isinstance(raw_facilities, dict) else None
+        )
+
+        # media join returns a list
+        media = masjid.get('media') or []
+
+        # Get live updates (active only) — set to None when empty
         live_updates = supabase.table('live_updates').select('*').eq(
             'masjid_id', str(masjid_id)
         ).gt('expires_at', 'now()').execute()
-        
-        masjid['live_status'] = live_updates.data
-        
-        return masjid
+        live_status = live_updates.data[0] if live_updates.data else None
+
+        # Build verification object from masjid row data
+        verification = {
+            'masjid_id': masjid['id'],
+            'status': masjid['status'],
+            'verification_count': masjid.get('verification_count', 0),
+            'needed_for_verification': 3,
+            'user_has_voted': False,
+            'user_vote_type': None,
+        }
+
+        return {
+            **masjid,
+            'latitude': lat,
+            'longitude': lng,
+            'facilities': facilities,
+            'media': media,
+            'live_status': live_status,
+            'verification': verification,
+        }
         
     except HTTPException:
         raise
