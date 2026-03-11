@@ -25,7 +25,7 @@ export function getAccessToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-function setTokens(access: string, refresh: string) {
+export function setTokens(access: string, refresh: string) {
   localStorage.setItem("access_token", access);
   localStorage.setItem("refresh_token", refresh);
 }
@@ -92,8 +92,8 @@ export const authApi = {
       { method: "POST", body: JSON.stringify(body) }
     ),
 
-  verifyOtp: (body: { email: string; token: string }) =>
-    request<{
+  verifyOtp: async (body: { email: string; token: string }) => {
+    const data = await request<{
       message: string;
       accessToken: string;
       refreshToken: string;
@@ -101,7 +101,10 @@ export const authApi = {
     }>("/api/v1/auth/verify-otp", {
       method: "POST",
       body: JSON.stringify(body),
-    }),
+    });
+    setTokens(data.accessToken, data.refreshToken);
+    return data;
+  },
 
   resendOtp: (email: string) =>
     request<{ message: string }>("/api/v1/auth/resend-otp", {

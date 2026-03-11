@@ -203,8 +203,26 @@ async def create_masjid(
             ).eq('id', current_user['id']).execute()
         except Exception:
             pass  # Non-critical - don't fail the masjid creation
-        
-        return result.data[0]
+
+        # Build full MasjidDetail response — DB row lacks lat/lng (stored as PostGIS)
+        # and related tables are empty on a brand-new masjid
+        row = result.data[0]
+        return {
+            **row,
+            "latitude": body.latitude,
+            "longitude": body.longitude,
+            "facilities": None,
+            "media": [],
+            "live_status": None,
+            "verification": {
+                "masjid_id": row["id"],
+                "status": row["status"],
+                "verification_count": 0,
+                "needed_for_verification": 3,
+                "user_has_voted": False,
+                "user_vote_type": None,
+            },
+        }
         
     except HTTPException:
         raise

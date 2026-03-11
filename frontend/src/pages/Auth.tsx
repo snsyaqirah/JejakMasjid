@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { authApi, ApiError } from "@/lib/api";
+import { authApi, ApiError, setTokens } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -50,8 +50,9 @@ const Auth = () => {
     setLoading(true);
     try {
       const data = await authApi.signup({ email, password, fullName });
-      if (data.accessToken && data.user) {
+      if (data.accessToken && data.refreshToken && data.user) {
         // Email confirm is OFF — user is auto-confirmed, log in immediately
+        setTokens(data.accessToken, data.refreshToken);
         authenticate(data.user as { id: string; email: string; user_metadata: Record<string, unknown> });
         toast({ title: "Akaun berjaya didaftarkan! 🎉", description: "Selamat datang ke JejakMasjid." });
         navigate("/");
