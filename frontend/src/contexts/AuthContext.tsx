@@ -1,83 +1,60 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-
-export interface UserProfile {
-  id: string;
-  email: string;
-  displayName: string;
-  avatar?: string;
-  createdAt: string;
-}
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
+import { authApi, userFromMeta, clearTokens, getAccessToken } from "@/lib/api";
+import type { AuthUser } from "@/types";
 
 interface AuthContextType {
-  user: UserProfile | null;
+  user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string, displayName: string) => Promise<boolean>;
-  logout: () => void;
+  /** Call after verifyOtp or login succeeds — stores user in state */
+  authenticate: (raw: {
+    id: string;
+    email: string;
+    user_metadata: Record<string, unknown>;
+  }) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = "jejakmasjid_user";
-const USERS_KEY = "jejakmasjid_users";
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Restore session from stored token on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {}
+    const token = getAccessToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    authApi
+      .me()
+      .then((raw) => setUser(userFromMeta(raw)))
+      .catch(() => clearTokens())
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const getUsers = (): Record<string, { profile: UserProfile; password: string }> => {
-    try {
-      return JSON.parse(localStorage.getItem(USERS_KEY) || "{}");
-    } catch {
-      return {};
-    }
-  };
+  const authenticate = useCallback(
+    (raw: { id: string; email: string; user_metadata: Record<string, unknown> }) => {
+      setUser(userFromMeta(raw));
+    },
+    []
+  );
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const users = getUsers();
-    const entry = users[email.toLowerCase()];
-    if (!entry || entry.password !== password) return false;
-    setUser(entry.profile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entry.profile));
-    return true;
-  };
-
-  const signup = async (email: string, password: string, displayName: string): Promise<boolean> => {
-    const users = getUsers();
-    const key = email.toLowerCase();
-    if (users[key]) return false; // already exists
-
-    const profile: UserProfile = {
-      id: crypto.randomUUID(),
-      email: key,
-      displayName,
-      createdAt: new Date().toISOString(),
-    };
-
-    users[key] = { profile, password };
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    setUser(profile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    return true;
-  };
-
-  const logout = () => {
+  const logout = useCallback(async () => {
+    await authApi.logout().catch(() => null);
     setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, authenticate, logout }}>
       {children}
     </AuthContext.Provider>
   );

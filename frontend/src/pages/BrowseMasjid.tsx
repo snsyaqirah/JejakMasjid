@@ -1,38 +1,45 @@
 import { useState } from "react";
 import { Search, MapPin, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MasjidCard from "@/components/MasjidCard";
-import { mockMasjids, QUICK_TAGS } from "@/data/mockData";
+import { masjidsApi } from "@/lib/api";
+import { QUICK_TAGS, TAG_FILTER_FN, type QuickTagKey } from "@/lib/constants";
+import type { Masjid } from "@/types";
 import { Link } from "react-router-dom";
 
 const BrowseMasjid = () => {
   const [search, setSearch] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<"visits" | "rating">("visits");
+  const [selectedTags, setSelectedTags] = useState<QuickTagKey[]>([]);
+  const [sortBy, setSortBy] = useState<"verification" | "name">("verification");
 
-  const toggleTag = (key: string) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ["masjids", "list", search],
+    queryFn: () => masjidsApi.list({ search: search || undefined, page_size: 50 }),
+  });
+
+  const allMasjids: Masjid[] = (data?.items ?? []) as Masjid[];
+
+  const toggleTag = (key: QuickTagKey) => {
     setSelectedTags((prev) =>
       prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]
     );
   };
 
-  const filtered = mockMasjids
+  const filtered = allMasjids
     .filter((m) => {
-      const matchSearch =
-        m.name.toLowerCase().includes(search.toLowerCase()) ||
-        m.location.toLowerCase().includes(search.toLowerCase()) ||
-        m.state.toLowerCase().includes(search.toLowerCase());
-      const matchTags =
-        selectedTags.length === 0 || selectedTags.every((t) => m.tags.includes(t));
-      return matchSearch && matchTags;
+      if (selectedTags.length === 0) return true;
+      const f = m.facilities as Record<string, unknown> | null;
+      if (!f) return false;
+      return selectedTags.every((t) => TAG_FILTER_FN[t](f));
     })
     .sort((a, b) =>
-      sortBy === "rating"
-        ? b.averageRating - a.averageRating
-        : b.totalVisits - a.totalVisits
+      sortBy === "name"
+        ? a.name.localeCompare(b.name)
+        : (b.verification_count ?? 0) - (a.verification_count ?? 0)
     );
 
   return (
@@ -86,25 +93,27 @@ const BrowseMasjid = () => {
         <div className="mb-6 flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Susun:</span>
           <button
-            onClick={() => setSortBy("visits")}
+            onClick={() => setSortBy("verification")}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              sortBy === "visits" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
+              sortBy === "verification" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
             }`}
           >
-            Paling Dikunjungi
+            Paling Disahkan
           </button>
           <button
-            onClick={() => setSortBy("rating")}
+            onClick={() => setSortBy("name")}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${
-              sortBy === "rating" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
+              sortBy === "name" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
             }`}
           >
-            <Star className="h-3 w-3" /> Rating Tertinggi
+            <Star className="h-3 w-3" /> Nama A-Z
           </button>
         </div>
 
         {/* Results */}
-        {filtered.length > 0 ? (
+        {isLoading ? (
+          <div className="py-20 text-center text-muted-foreground">Memuatkan masjid...</div>
+        ) : filtered.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((masjid) => (
               <MasjidCard key={masjid.id} masjid={masjid} />

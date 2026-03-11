@@ -1,80 +1,133 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { MapPin, CheckCircle, ArrowLeft, Users, Star, Car, Train, Accessibility, Wind, Wifi, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  MapPin, CheckCircle, ArrowLeft, Users, Wind, Cat,
+  Utensils, ThumbsUp, ThumbsDown, Loader2, Moon
+} from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { mockMasjids, QUICK_TAGS, VIBE_TAGS } from "@/data/mockData";
+import { masjidsApi, verificationsApi, checkinsApi, liveUpdatesApi, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import type { Masjid, Facilities, LiveStatus } from "@/types";
 
-const StarRating = ({ rating, onRate, interactive = false }: { rating: number; onRate?: (r: number) => void; interactive?: boolean }) => (
-  <div className="flex gap-0.5">
-    {[1, 2, 3, 4, 5].map((i) => (
-      <Star
-        key={i}
-        className={`h-5 w-5 transition-colors ${
-          i <= rating ? "text-accent fill-accent" : "text-muted-foreground/30"
-        } ${interactive ? "cursor-pointer hover:text-accent" : ""}`}
-        onClick={() => interactive && onRate?.(i)}
-      />
-    ))}
-  </div>
-);
+const VISIT_TYPES = [
+  { key: "general", label: "Solat" },
+  { key: "jumaat", label: "Jumaat" },
+  { key: "terawih", label: "Terawih" },
+  { key: "iftar", label: "Iftar" },
+  { key: "kuliah", label: "Kuliah" },
+] as const;
 
 const MasjidDetail = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const masjid = mockMasjids.find((m) => m.id === id);
+  const queryClient = useQueryClient();
 
-  const [showAllReviews, setShowAllReviews] = useState(false);
-  const [reviewForm, setReviewForm] = useState({ rating: 0, text: "", vibeTags: [] as string[] });
-  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
 
-  const requireLogin = (action: string) => {
+  // ── queries ───────────────────────────────────────────────────
+  const { data: masjid, isLoading, isError } = useQuery({
+    queryKey: ["masjid", id],
+    queryFn: () => masjidsApi.get(id!),
+    enabled: !!id,
+  });
+
+  const { data: liveStatus } = useQuery({
+    queryKey: ["liveStatus", id],
+    queryFn: () => liveUpdatesApi.getStatus(id!),
+    enabled: !!id,
+  });
+
+  const { data: verifyStatus, refetch: refetchVerify } = useQuery({
+    queryKey: ["verifyStatus", id],
+    queryFn: () => verificationsApi.status(id!),
+    enabled: !!id && !!user,
+  });
+
+  // ── mutations ─────────────────────────────────────────────────
+  const voteMutation = useMutation({
+    mutationFn: (voteType: "upvote" | "downvote") =>
+      verificationsApi.vote({ masjidId: id!, voteType }),
+    onSuccess: () => {
+      toast({ title: "Terima kasih!", description: "Pengesahan anda direkodkan." });
+      queryClient.invalidateQueries({ queryKey: ["masjid", id] });
+      refetchVerify();
+    },
+    onError: (e) => {
+      toast({ title: "Gagal", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
+    },
+  });
+
+  // ── check in ──────────────────────────────────────────────────
+  const handleCheckIn = async (visitType: string) => {
     if (!user) {
-      toast({ title: "Log masuk diperlukan", description: `Sila log masuk untuk ${action}.`, variant: "destructive" });
+      toast({ title: "Log masuk diperlukan", variant: "destructive" });
       navigate("/auth");
-      return true;
-    }
-    return false;
-  };
-
-  const handleTrack = (type: string) => {
-    if (requireLogin(`merekod ${type}`)) return;
-    toast({ title: `${type} direkodkan!`, description: `Kunjungan anda ke ${masjid?.name} telah disimpan.` });
-  };
-
-  const handleVerify = () => {
-    if (requireLogin("mengesahkan masjid")) return;
-    toast({ title: "Terima kasih!", description: "Pengesahan anda telah direkodkan." });
-  };
-
-  const handleReviewSubmit = () => {
-    if (requireLogin("menulis review")) return;
-    if (reviewForm.rating === 0) {
-      toast({ title: "Rating diperlukan", description: "Sila bagi rating bintang.", variant: "destructive" });
       return;
     }
-    toast({ title: "Review dihantar!", description: "Terima kasih atas sumbangan anda." });
-    setReviewForm({ rating: 0, text: "", vibeTags: [] });
-    setShowReviewForm(false);
+    if (!navigator.geolocation) {
+      toast({ title: "GPS tidak disokong", description: "Pelayar anda tidak menyokong geolokasi.", variant: "destructive" });
+      return;
+    }
+    setCheckingIn(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const result = await checkinsApi.checkIn({
+            masjidId: id!,
+            visitType,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          }) as { streak_count?: number; points_earned?: number; badges_unlocked?: string[] };
+          toast({
+            title: `Check-in berjaya! ���`,
+            description: `+${result.points_earned ?? 0} mata. Streak: ${result.streak_count ?? 0} hari.`,
+          });
+        } catch (e) {
+          const msg = e instanceof ApiError
+            ? e.message
+            : "Gagal check-in. Pastikan anda berada dalam 200m dari masjid.";
+          toast({ title: "Gagal check-in", description: msg, variant: "destructive" });
+        } finally {
+          setCheckingIn(false);
+        }
+      },
+      () => {
+        toast({ title: "GPS diperlukan", description: "Sila benarkan akses GPS.", variant: "destructive" });
+        setCheckingIn(false);
+      }
+    );
   };
 
-  const toggleVibeTag = (tag: string) => {
-    setReviewForm((prev) => ({
-      ...prev,
-      vibeTags: prev.vibeTags.includes(tag)
-        ? prev.vibeTags.filter((t) => t !== tag)
-        : [...prev.vibeTags, tag],
-    }));
+  const handleVote = (type: "upvote" | "downvote") => {
+    if (!user) {
+      toast({ title: "Log masuk diperlukan", variant: "destructive" });
+      navigate("/auth");
+      return;
+    }
+    voteMutation.mutate(type);
   };
 
-  if (!masjid) {
+  // ── loading / error states ────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center py-40">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isError || !masjid) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
@@ -87,233 +140,177 @@ const MasjidDetail = () => {
     );
   }
 
-  const parkingLabel = { luas: "Parking luas", terhad: "Parking terhad", tiada: "Tiada parking", "": "" };
-  const displayedReviews = showAllReviews ? masjid.reviews : masjid.reviews.slice(0, 2);
+  const m = masjid as unknown as Masjid;
+  const f = m.facilities as Facilities | null;
+  const isVerified = m.status === "verified";
+  const live = liveStatus as LiveStatus | undefined;
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <Link to="/browse" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
-          <ArrowLeft className="h-4 w-4" />
-          Kembali ke senarai
+        <Link to="/browse" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="h-4 w-4" /> Kembali ke senarai
         </Link>
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Main Content */}
+          {/* Main */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Image */}
+            {/* Placeholder image */}
             <div className="h-64 md:h-80 rounded-2xl overflow-hidden bg-secondary flex items-center justify-center">
-              {masjid.image ? (
-                <img src={masjid.image} alt={masjid.name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="text-center">
-                  <MapPin className="mx-auto h-16 w-16 text-muted-foreground/20" />
-                  <p className="mt-2 text-sm text-muted-foreground">Belum ada gambar</p>
-                </div>
-              )}
+              <div className="text-center">
+                <Moon className="mx-auto h-16 w-16 text-muted-foreground/20" />
+                <p className="mt-2 text-sm text-muted-foreground">Belum ada gambar</p>
+              </div>
             </div>
 
             {/* Info */}
             <div>
               <div className="flex items-start gap-3 flex-wrap">
-                <h1 className="font-serif text-3xl font-bold text-foreground">{masjid.name}</h1>
-                {masjid.verified ? (
+                <h1 className="font-serif text-3xl font-bold text-foreground">{m.name}</h1>
+                {isVerified ? (
                   <Badge className="bg-accent text-accent-foreground gap-1 font-sans mt-1">
                     <CheckCircle className="h-3 w-3" /> Disahkan
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="font-sans mt-1">Belum disahkan ({masjid.verificationCount}/3)</Badge>
+                  <Badge variant="secondary" className="font-sans mt-1">
+                    Belum disahkan ({m.verification_count}/3)
+                  </Badge>
                 )}
               </div>
               <p className="mt-2 flex items-center gap-1.5 text-muted-foreground">
-                <MapPin className="h-4 w-4" /> {masjid.location}, {masjid.state}
+                <MapPin className="h-4 w-4" /> {m.address}
               </p>
-              {masjid.averageRating > 0 && (
-                <div className="mt-2 flex items-center gap-2">
-                  <StarRating rating={Math.round(masjid.averageRating)} />
-                  <span className="text-sm font-semibold text-foreground">{masjid.averageRating.toFixed(1)}</span>
-                  <span className="text-xs text-muted-foreground">({masjid.reviews.length} review)</span>
-                </div>
+              {m.description && (
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{m.description}</p>
               )}
             </div>
 
-            {/* Facilities Grid */}
-            <div className="rounded-2xl border bg-card p-6">
-              <h3 className="font-serif text-lg font-semibold mb-4">Kemudahan & Info</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {masjid.hasTerawih && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <Star className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="font-medium text-foreground">Terawih</p>
-                      {masjid.terawihRakaat && <p className="text-xs text-muted-foreground">{masjid.terawihRakaat} rakaat</p>}
+            {/* Live Status */}
+            {live && (live.crowd_level || live.saf_status || live.parking_status || live.iftar_menu) && (
+              <div className="rounded-2xl border bg-card p-6">
+                <h3 className="font-serif text-lg font-semibold mb-3">Status Terkini</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {live.crowd_level && (
+                    <div className="rounded-xl bg-primary/5 p-3">
+                      <p className="text-xs text-muted-foreground">Kepadatan</p>
+                      <p className="font-medium">{live.crowd_level}</p>
                     </div>
-                  </div>
-                )}
-                {masjid.hasIftar && (
-                   <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                     <Users className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="font-medium text-foreground">Iftar</p>
-                      {masjid.iftarInfo && <p className="text-xs text-muted-foreground line-clamp-2">{masjid.iftarInfo}</p>}
+                  )}
+                  {live.saf_status && (
+                    <div className="rounded-xl bg-primary/5 p-3">
+                      <p className="text-xs text-muted-foreground">Status Saf</p>
+                      <p className="font-medium">{live.saf_status}</p>
                     </div>
-                  </div>
-                )}
-                {masjid.hasOKUAccess && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <Accessibility className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="font-medium text-foreground">Mesra OKU</p>
-                      <p className="text-xs text-muted-foreground">Lift / kerusi roda</p>
+                  )}
+                  {live.parking_status && (
+                    <div className="rounded-xl bg-primary/5 p-3">
+                      <p className="text-xs text-muted-foreground">Parking</p>
+                      <p className="font-medium">{live.parking_status}</p>
                     </div>
-                  </div>
-                )}
-                {masjid.hasWomenSpace && (
-                   <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                     <Users className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="font-medium text-foreground">Ruang Wanita</p>
-                      {masjid.womenSpaceInfo && <p className="text-xs text-muted-foreground line-clamp-2">{masjid.womenSpaceInfo}</p>}
+                  )}
+                  {live.iftar_menu && (
+                    <div className="rounded-xl bg-primary/5 p-3">
+                      <p className="text-xs text-muted-foreground">Menu Iftar</p>
+                      <p className="font-medium">{live.iftar_menu}</p>
                     </div>
-                  </div>
-                )}
-                {masjid.hasAC && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <Wind className="h-4 w-4 text-primary" />
-                    <p className="font-medium text-foreground">Aircon</p>
-                  </div>
-                )}
-                {masjid.hasWifi && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <Wifi className="h-4 w-4 text-primary" />
-                    <p className="font-medium text-foreground">WiFi</p>
-                  </div>
-                )}
-                {masjid.nearPublicTransport && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <Train className="h-4 w-4 text-primary" />
-                    <p className="font-medium text-foreground">Dekat transit</p>
-                  </div>
-                )}
-                {masjid.parkingStatus && (
-                  <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                    <Car className="h-4 w-4 text-primary" />
-                    <p className="font-medium text-foreground">{parkingLabel[masjid.parkingStatus]}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Reviews Section */}
-            <div className="rounded-2xl border bg-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-lg font-semibold">Review Komuniti ({masjid.reviews.length})</h3>
-                {user && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-lg text-xs"
-                    onClick={() => setShowReviewForm(!showReviewForm)}
-                  >
-                    Tulis Review
-                  </Button>
-                )}
-              </div>
-
-              {/* Review Form */}
-              {showReviewForm && (
-                <div className="mb-6 rounded-xl border bg-background p-4 space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Rating anda</p>
-                    <StarRating rating={reviewForm.rating} onRate={(r) => setReviewForm({ ...reviewForm, rating: r })} interactive />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium mb-2">Vibe masjid ni (pilih yang sesuai)</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {VIBE_TAGS.map((tag) => (
-                        <button
-                          key={tag}
-                          onClick={() => toggleVibeTag(tag)}
-                          className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                            reviewForm.vibeTags.includes(tag)
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <Textarea
-                    placeholder="Kongsi pengalaman anda di masjid ni... (cth: Imam bacaan sedap, carpet baru, parking senang)"
-                    value={reviewForm.text}
-                    onChange={(e) => setReviewForm({ ...reviewForm, text: e.target.value })}
-                    className="rounded-xl bg-card min-h-[80px]"
-                    maxLength={500}
-                  />
-                  <div className="flex gap-2">
-                    <Button onClick={handleReviewSubmit} size="sm" className="rounded-lg">
-                      Hantar Review
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setShowReviewForm(false)} className="rounded-lg">
-                      Batal
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Reviews List */}
-              {masjid.reviews.length > 0 ? (
-                <div className="space-y-4">
-                  {displayedReviews.map((review) => (
-                    <div key={review.id} className="rounded-xl border bg-background p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                            {review.userName.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{review.userName}</p>
-                            <p className="text-xs text-muted-foreground">{review.date}</p>
-                          </div>
-                        </div>
-                        <StarRating rating={review.rating} />
-                      </div>
-                      {review.vibeTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {review.vibeTags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs rounded-full">{tag}</Badge>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-sm text-muted-foreground leading-relaxed">{review.text}</p>
-                    </div>
-                  ))}
-
-                  {masjid.reviews.length > 2 && (
-                    <button
-                      onClick={() => setShowAllReviews(!showAllReviews)}
-                      className="flex items-center gap-1 text-sm text-primary font-medium hover:underline"
-                    >
-                      {showAllReviews ? (
-                        <><ChevronUp className="h-4 w-4" /> Tutup</>
-                      ) : (
-                        <><ChevronDown className="h-4 w-4" /> Lihat semua {masjid.reviews.length} review</>
-                      )}
-                    </button>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Belum ada review. Jadilah yang pertama!</p>
-              )}
+              </div>
+            )}
 
+            {/* Facilities */}
+            {f && (
+              <div className="rounded-2xl border bg-card p-6">
+                <h3 className="font-serif text-lg font-semibold mb-4">Kemudahan & Info</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {f.has_iftar && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Utensils className="h-4 w-4 text-primary" />
+                      <div>
+                        <p className="font-medium">Iftar</p>
+                        {f.iftar_type && <p className="text-xs text-muted-foreground">{f.iftar_type}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {f.terawih_rakaat && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Moon className="h-4 w-4 text-primary" />
+                      <div>
+                        <p className="font-medium">Terawih</p>
+                        <p className="text-xs text-muted-foreground">{f.terawih_rakaat} rakaat</p>
+                      </div>
+                    </div>
+                  )}
+                  {f.cooling_system && f.cooling_system !== "Tiada" && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Wind className="h-4 w-4 text-primary" />
+                      <p className="font-medium">{f.cooling_system}</p>
+                    </div>
+                  )}
+                  {f.kucing_count && f.kucing_count !== "Tiada" && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Cat className="h-4 w-4 text-primary" />
+                      <div>
+                        <p className="font-medium">Kucing</p>
+                        <p className="text-xs text-muted-foreground">{f.kucing_count}</p>
+                      </div>
+                    </div>
+                  )}
+                  {f.is_family_friendly && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Users className="h-4 w-4 text-primary" />
+                      <p className="font-medium">Mesra Keluarga</p>
+                    </div>
+                  )}
+                  {f.has_kids_area && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Users className="h-4 w-4 text-primary" />
+                      <p className="font-medium">Ruang Kanak-kanak</p>
+                    </div>
+                  )}
+                  {f.parking_level && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <p className="font-medium">Parking: {f.parking_level}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Upvote / Downvote */}
+            <div className="rounded-2xl border bg-card p-6">
+              <h3 className="font-serif text-lg font-semibold mb-2">Ada kat sini? Sahkan!</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Pernah pergi masjid ni? Bantu komuniti dengan sahkan info ini betul.
+                3 pengesahan = Disahkan!
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 border-accent/40 text-accent hover:bg-accent/10"
+                  onClick={() => handleVote("upvote")}
+                  disabled={voteMutation.isPending}
+                >
+                  <ThumbsUp className="h-4 w-4" />
+                  Betul ({m.verification_count})
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2 text-muted-foreground"
+                  onClick={() => handleVote("downvote")}
+                  disabled={voteMutation.isPending}
+                >
+                  <ThumbsDown className="h-4 w-4" />
+                  Info salah
+                </Button>
+              </div>
               {!user && (
-                <p className="mt-4 text-xs text-muted-foreground">
+                <p className="mt-3 text-xs text-muted-foreground text-center">
                   <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}
-                  untuk tulis review
+                  untuk mengesahkan
                 </p>
               )}
             </div>
@@ -325,57 +322,45 @@ const MasjidDetail = () => {
               <h3 className="font-serif text-lg font-semibold mb-4">Statistik</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">{masjid.totalVisits}</p>
-                    <p className="text-xs text-muted-foreground">Jumlah kunjungan</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
                     <CheckCircle className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">{masjid.verificationCount}/3</p>
+                    <p className="font-semibold text-foreground">{m.verification_count}/3</p>
                     <p className="text-xs text-muted-foreground">Pengesahan diterima</p>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Check-in */}
             <div className="rounded-2xl border bg-card p-4 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Rekod Kunjungan</p>
-              <Button onClick={() => handleTrack("Solat")} className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-5 text-sm">
-                Saya solat di sini
-              </Button>
-              <Button onClick={() => handleTrack("Terawih")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                Terawih
-              </Button>
-              <Button onClick={() => handleTrack("Iftar")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                Iftar
-              </Button>
-              <Button onClick={() => handleTrack("Jumaat")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                Solat Jumaat
-              </Button>
-              <Button onClick={() => handleTrack("Ziarah")} variant="outline" className="w-full rounded-xl font-semibold py-5 text-sm">
-                Ziarah
-              </Button>
-            </div>
-
-            {!masjid.verified && (
-              <Button onClick={handleVerify} variant="outline" className="w-full rounded-xl text-accent border-accent/30 hover:bg-accent/10 font-semibold py-6">
-                Sahkan masjid ini betul
-              </Button>
-            )}
-
-            {!user && (
-              <p className="text-center text-xs text-muted-foreground">
-                <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}
-                untuk merekod kunjungan
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Check-in (GPS diperlukan)
               </p>
-            )}
+              {checkingIn ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                VISIT_TYPES.map((v) => (
+                  <Button
+                    key={v.key}
+                    onClick={() => handleCheckIn(v.key)}
+                    variant={v.key === "general" ? "default" : "outline"}
+                    className="w-full rounded-xl font-semibold py-5 text-sm"
+                  >
+                    {v.label}
+                  </Button>
+                ))
+              )}
+              {!user && (
+                <p className="text-center text-xs text-muted-foreground pt-1">
+                  <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}
+                  untuk check-in
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

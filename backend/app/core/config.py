@@ -12,6 +12,11 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────────────────
     DATABASE_URL: str  # e.g. postgresql+asyncpg://user:pass@localhost:5432/jejakmasjid
+    
+    # ── Supabase ─────────────────────────────────────────────────────────────
+    SUPABASE_URL: str              # Your Supabase project URL
+    SUPABASE_ANON_KEY: str         # Supabase anon/public key
+    SUPABASE_SERVICE_KEY: str      # Supabase service_role key (for admin operations)
 
     # ── Security / JWT ────────────────────────────────────────────────────────
     SECRET_KEY: str                          # generate with: openssl rand -hex 32

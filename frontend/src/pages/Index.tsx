@@ -1,14 +1,20 @@
 import { Link } from "react-router-dom";
 import { MapPin, Moon, Star, ArrowRight, Users, Compass } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MasjidCard from "@/components/MasjidCard";
-import { mockMasjids } from "@/data/mockData";
+import { masjidsApi } from "@/lib/api";
+import type { Masjid } from "@/types";
 import heroImage from "@/assets/hero-mosque.jpg";
 
 const Index = () => {
-  const featuredMasjids = mockMasjids.filter((m) => m.verified).slice(0, 3);
+  const { data } = useQuery({
+    queryKey: ["masjids", "featured"],
+    queryFn: () => masjidsApi.list({ status: "verified", page_size: 3 }),
+  });
+  const featuredMasjids: Masjid[] = (data?.items ?? []) as Masjid[];
 
   return (
     <div className="min-h-screen bg-background">

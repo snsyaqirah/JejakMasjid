@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, ArrowLeft } from "lucide-react";
+import { MapPin, ArrowLeft, LocateFixed } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,53 +7,108 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { masjidsApi, ApiError } from "@/lib/api";
+import { MALAYSIA_STATES } from "@/lib/constants";
 
 const AddMasjid = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    location: "",
-    state: "",
+    address: "",
     description: "",
+    latitude: "",
+    longitude: "",
     hasTerawih: false,
     hasIftar: false,
     hasOKUAccess: false,
-    hasWomenSpace: false,
-    hasAC: false,
-    hasWifi: false,
-    nearPublicTransport: false,
-    parkingStatus: "" as "" | "luas" | "terhad" | "tiada",
+    hasKidsArea: false,
+    hasCoway: false,
     terawihRakaat: "",
     iftarInfo: "",
-    womenSpaceInfo: "",
   });
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Masjid berjaya ditambah!",
-      description: `${form.name} kini boleh dilihat oleh komuniti. Ia akan disahkan selepas 3 pengesahan.`,
-    });
-    setForm({
-      name: "", location: "", state: "", description: "",
-      hasTerawih: false, hasIftar: false, hasOKUAccess: false,
-      hasWomenSpace: false, hasAC: false, hasWifi: false,
-      nearPublicTransport: false, parkingStatus: "",
-      terawihRakaat: "", iftarInfo: "", womenSpaceInfo: "",
-    });
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ title: "GPS tidak disokong", variant: "destructive" });
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((f) => ({
+          ...f,
+          latitude: pos.coords.latitude.toFixed(6),
+          longitude: pos.coords.longitude.toFixed(6),
+        }));
+        setLocating(false);
+        toast({ title: "Lokasi dikesan!", description: `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}` });
+      },
+      () => {
+        toast({ title: "Gagal kesan GPS", description: "Sila benarkan akses GPS atau isi koordinat manual.", variant: "destructive" });
+        setLocating(false);
+      }
+    );
   };
 
-  const states = [
-    "Johor", "Kedah", "Kelantan", "Kuala Lumpur", "Melaka", "Negeri Sembilan",
-    "Pahang", "Penang", "Perak", "Perlis", "Putrajaya", "Sabah", "Sarawak",
-    "Selangor", "Terengganu",
-  ];
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.latitude || !form.longitude) {
+      toast({ title: "Koordinat diperlukan", description: "Gunakan butang GPS atau isi koordinat.", variant: "destructive" });
+      return;
+    }
+    const lat = parseFloat(form.latitude);
+    const lng = parseFloat(form.longitude);
+    if (isNaN(lat) || isNaN(lng)) {
+      toast({ title: "Koordinat tidak sah", variant: "destructive" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Check for nearby duplicates first
+      const nearby = await masjidsApi.checkNearby(lat, lng, 100) as Array<{ id: string; name: string }>;
+      if (nearby.length > 0) {
+        toast({
+          title: "Masjid mungkin sudah wujud",
+          description: `"${nearby[0].name}" ditemui dalam radius 100m. Sila semak dahulu.`,
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      const result = await masjidsApi.create({
+        name: form.name,
+        address: form.address,
+        description: form.description || undefined,
+        latitude: lat,
+        longitude: lng,
+      }) as { id: string };
+
+      toast({
+        title: "Masjid berjaya ditambah! 🕌",
+        description: `${form.name} kini boleh dilihat oleh komuniti. 3 pengesahan diperlukan.`,
+      });
+      navigate(`/masjid/${result.id}`);
+    } catch (err) {
+      toast({
+        title: "Gagal tambah masjid",
+        description: err instanceof ApiError ? err.message : "Sila cuba lagi.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,18 +138,28 @@ const AddMasjid = () => {
               <Input id="name" placeholder="cth: Masjid Al-Ikhlas" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl bg-background" required />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="location" className="font-medium">Lokasi / Kawasan *</Label>
-                <Input id="location" placeholder="cth: Taman Sri Muda, Shah Alam" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="rounded-xl bg-background" required />
+            <div className="space-y-2">
+              <Label htmlFor="address" className="font-medium">Alamat Penuh *</Label>
+              <Input id="address" placeholder="cth: No 1, Jalan Masjid, Taman Sri Muda, 40150 Shah Alam, Selangor" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-xl bg-background" required />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-medium">Koordinat GPS *</Label>
+              <Button type="button" variant="outline" className="w-full rounded-xl gap-2" onClick={detectLocation} disabled={locating}>
+                <LocateFixed className="h-4 w-4" />
+                {locating ? "Mengesan lokasi..." : "Gunakan Lokasi Semasa (GPS)"}
+              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="lat" className="text-xs text-muted-foreground">Latitud</Label>
+                  <Input id="lat" placeholder="3.139003" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} className="rounded-xl bg-background" />
+                </div>
+                <div>
+                  <Label htmlFor="lng" className="text-xs text-muted-foreground">Longitud</Label>
+                  <Input id="lng" placeholder="101.686855" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} className="rounded-xl bg-background" />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="state" className="font-medium">Negeri *</Label>
-                <select id="state" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className="w-full rounded-xl border bg-background px-3 py-2 text-sm" required>
-                  <option value="">Pilih negeri</option>
-                  {states.map((s) => (<option key={s} value={s}>{s}</option>))}
-                </select>
-              </div>
+              <p className="text-xs text-muted-foreground">Koordinat diperlukan untuk ciri berdekatan & check-in</p>
             </div>
 
             <div className="space-y-2">
@@ -103,17 +168,17 @@ const AddMasjid = () => {
             </div>
           </div>
 
-          {/* Facilities */}
+          {/* Facilities (basic — can be updated later) */}
           <div className="rounded-2xl border bg-card p-6 space-y-5">
-            <h3 className="font-serif text-base font-semibold">Kemudahan</h3>
+            <h3 className="font-serif text-base font-semibold">Kemudahan (Opsyen)</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                 { key: "hasOKUAccess", label: "Mesra OKU (lift/wheelchair)" },
-                 { key: "hasWomenSpace", label: "Ruang Solat Wanita" },
-                 { key: "hasAC", label: "Aircon" },
-                 { key: "hasWifi", label: "WiFi" },
-                 { key: "nearPublicTransport", label: "Dekat Public Transport" },
-               ].map((item) => (
+                { key: "hasTerawih", label: "Ada Terawih" },
+                { key: "hasIftar", label: "Ada Iftar" },
+                { key: "hasOKUAccess", label: "Mesra OKU" },
+                { key: "hasKidsArea", label: "Ruang Kanak-kanak" },
+                { key: "hasCoway", label: "Ada Coway" },
+              ].map((item) => (
                 <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
                   <Checkbox
                     checked={form[item.key as keyof typeof form] as boolean}
@@ -124,61 +189,17 @@ const AddMasjid = () => {
               ))}
             </div>
 
-            <div className="space-y-2">
-              <Label className="font-medium">Status Parking</Label>
-              <div className="flex gap-2">
-                {([["luas", "Parking Luas"], ["terhad", "Terhad"], ["tiada", "Tiada Parking"]] as const).map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setForm({ ...form, parkingStatus: form.parkingStatus === val ? "" : val })}
-                    className={`rounded-full px-4 py-2 text-xs font-medium transition-colors ${
-                      form.parkingStatus === val
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {form.hasWomenSpace && (
-              <div className="space-y-2">
-                <Label className="font-medium">Info Ruang Wanita</Label>
-                <Input placeholder="cth: Luas, ada partition kain, tingkat 2" value={form.womenSpaceInfo} onChange={(e) => setForm({ ...form, womenSpaceInfo: e.target.value })} className="rounded-xl bg-background" />
-              </div>
-            )}
-          </div>
-
-          {/* Ibadah Info */}
-          <div className="rounded-2xl border bg-card p-6 space-y-5">
-            <h3 className="font-serif text-base font-semibold">Info Ibadah</h3>
-            <div className="flex gap-6">
-               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                 <Checkbox checked={form.hasTerawih} onCheckedChange={(c) => setForm({ ...form, hasTerawih: !!c })} />
-                 Ada Terawih
-               </label>
-               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={form.hasIftar} onCheckedChange={(c) => setForm({ ...form, hasIftar: !!c })} />
-                Ada Iftar
-              </label>
-            </div>
-
             {form.hasTerawih && (
               <div className="space-y-2">
                 <Label className="font-medium">Terawih berapa rakaat?</Label>
                 <div className="flex gap-2">
-                  {["8", "20", "23"].map((r) => (
+                  {["8", "11", "20", "23"].map((r) => (
                     <button
                       key={r}
                       type="button"
                       onClick={() => setForm({ ...form, terawihRakaat: form.terawihRakaat === r ? "" : r })}
                       className={`rounded-full px-4 py-2 text-xs font-medium transition-colors ${
-                        form.terawihRakaat === r
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-muted-foreground"
+                        form.terawihRakaat === r ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
                       }`}
                     >
                       {r} rakaat
@@ -191,14 +212,14 @@ const AddMasjid = () => {
             {form.hasIftar && (
               <div className="space-y-2">
                 <Label className="font-medium">Info Iftar</Label>
-                <Input placeholder="cth: Kena daftar dulu / Bawa bekas sendiri / Walk-in" value={form.iftarInfo} onChange={(e) => setForm({ ...form, iftarInfo: e.target.value })} className="rounded-xl bg-background" />
+                <Input placeholder="cth: Walk-in / Kena daftar dulu" value={form.iftarInfo} onChange={(e) => setForm({ ...form, iftarInfo: e.target.value })} className="rounded-xl bg-background" />
               </div>
             )}
           </div>
 
-          <Button type="submit" size="lg" className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-6 text-base">
+          <Button type="submit" size="lg" disabled={submitting} className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-6 text-base">
             <MapPin className="mr-2 h-5 w-5" />
-            Kongsi Masjid Ini
+            {submitting ? "Menyimpan..." : "Kongsi Masjid Ini"}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
