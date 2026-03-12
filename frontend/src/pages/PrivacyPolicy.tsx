@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
                 <li><strong className="text-foreground">Pemadaman</strong> — meminta pemadaman akaun dan data peribadi anda</li>
                 <li><strong className="text-foreground">Bantahan</strong> — membantah pemprosesan data anda untuk tujuan tertentu</li>
               </ul>
-              <p className="mt-3">Untuk menggunakan hak-hak ini, hubungi kami di <strong className="text-foreground">privasi@jejakmasjid.com</strong> atau melalui borang di halaman profil anda.</p>
+              <p className="mt-3">Untuk menggunakan hak-hak ini, hubungi kami di <strong className="text-foreground">meraqi@gmail.com</strong> atau melalui borang di halaman profil anda.</p>
             </section>
 
             <section>
@@ -131,7 +131,7 @@ export default function PrivacyPolicy() {
               <p>Sebarang pertanyaan, aduan atau permintaan berkaitan privasi, sila hubungi:</p>
               <div className="mt-3 rounded-xl border bg-card p-4 text-foreground text-sm">
                 <p className="font-semibold">JejakMasjid — Pegawai Perlindungan Data</p>
-                <p className="mt-1">Emel: <a href="mailto:privasi@jejakmasjid.com" className="text-primary hover:underline">privasi@jejakmasjid.com</a></p>
+                <p className="mt-1">Emel: <a href="mailto:meraqi@gmail.com" className="text-primary hover:underline">meraqi@gmail.com</a></p>
                 <p>Laman web: <a href="https://jejakmasjid.vercel.app" className="text-primary hover:underline">jejakmasjid.vercel.app</a></p>
               </div>
             </section>
