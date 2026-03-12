@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
             </div>
             <div>
               <h1 className="font-serif text-3xl font-bold">Dasar Privasi</h1>
-              <p className="text-sm text-muted-foreground mt-1">Berkuat kuasa: 1 Januari 2025 · Dikemaskini: Mac 2026</p>
+              <p className="text-sm text-muted-foreground mt-1">Berkuat kuasa: 13 Mac 2026 · Dikemaskini: Mac 2026</p>
             </div>
           </div>
 

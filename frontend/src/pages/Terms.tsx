@@ -15,7 +15,7 @@ export default function Terms() {
             </div>
             <div>
               <h1 className="font-serif text-3xl font-bold">Terma Perkhidmatan</h1>
-              <p className="text-sm text-muted-foreground mt-1">Berkuat kuasa: 1 Januari 2025 · Dikemaskini: Mac 2026</p>
+              <p className="text-sm text-muted-foreground mt-1">Berkuat kuasa: 13 Mac 2026 · Dikemaskini: Mac 2026</p>
             </div>
           </div>
 
@@ -127,7 +127,7 @@ export default function Terms() {
               <p>Sebarang pertanyaan mengenai Terma Perkhidmatan ini:</p>
               <div className="mt-3 rounded-xl border bg-card p-4 text-foreground text-sm">
                 <p className="font-semibold">JejakMasjid</p>
-                <p className="mt-1">Emel: <a href="mailto:hello@jejakmasjid.com" className="text-primary hover:underline">hello@jejakmasjid.com</a></p>
+                <p className="mt-1">Emel: <a href="mailto:meraqi@gmail.com" className="text-primary hover:underline">meraqi@gmail.com</a></p>
                 <p>Laman web: <a href="https://jejakmasjid.vercel.app" className="text-primary hover:underline">jejakmasjid.vercel.app</a></p>
               </div>
             </section>
