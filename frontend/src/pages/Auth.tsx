@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Moon, ArrowLeft, LogIn, UserPlus, KeyRound, Eye, EyeOff, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -77,9 +77,24 @@ const Auth = () => {
   const [gender, setGender] = useState<"Lelaki" | "Perempuan" | "">("")
   const [showPassword, setShowPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);;
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { authenticate } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Clean up interval on unmount
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
+
+  const startCooldown = (seconds = 60) => {
+    setResendCooldown(seconds);
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) { clearInterval(cooldownRef.current!); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +143,7 @@ const Auth = () => {
           title: "Kod pengesahan dihantar!",
           description: `Semak inbox ${email} untuk kod anda.`,
         });
+        startCooldown(60);
         setStep("otp");
       }
     } catch (err) {
@@ -169,6 +185,7 @@ const Auth = () => {
     try {
       await authApi.resendOtp(email);
       toast({ title: "Kod dihantar semula", description: `Semak inbox ${email}.` });
+      startCooldown(60);
     } catch {
       toast({ title: "Gagal hantar semula", variant: "destructive" });
     } finally {
@@ -226,14 +243,20 @@ const Auth = () => {
                   </Button>
                 </form>
                 <div className="mt-4 text-center">
-                  <button
-                    type="button"
-                    onClick={handleResendOtp}
-                    disabled={loading}
-                    className="text-sm text-muted-foreground hover:text-foreground underline"
-                  >
-                    Hantar semula kod
-                  </button>
+                  {resendCooldown > 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Hantar semula dalam <span className="font-medium tabular-nums">{resendCooldown}s</span>
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={loading}
+                      className="text-sm text-muted-foreground hover:text-foreground underline"
+                    >
+                      Hantar semula kod
+                    </button>
+                  )}
                 </div>
               </>
             )}
