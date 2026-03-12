@@ -1,5 +1,6 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import Optional
 from app.schemas.base import CamelModel
 from app.core.supabase import get_supabase_admin
@@ -8,12 +9,25 @@ from supabase import Client
 
 router = APIRouter()
 
+# Allowed path pattern: /word-chars and slashes only (no JS injection, no external URLs)
+_PAGE_URL_RE = re.compile(r'^/[a-zA-Z0-9/_\-]*$')
+
 
 class FeedbackCreate(CamelModel):
     message: str = Field(min_length=5, max_length=1000)
     rating: Optional[int] = Field(None, ge=1, le=5)
-    page_url: Optional[str] = None
+    page_url: Optional[str] = Field(None, max_length=200)
     name: Optional[str] = Field(None, max_length=100)
+
+    @field_validator('page_url')
+    @classmethod
+    def validate_page_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not _PAGE_URL_RE.match(v):
+            return None  # silently drop invalid URLs rather than crashing
+        return v
 
 
 class FeedbackResponse(CamelModel):

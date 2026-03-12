@@ -108,7 +108,10 @@ async def list_masjids(
         
         # Search by name/address
         if search:
-            query = query.or_(f'name.ilike.%{search}%,address.ilike.%{search}%')
+            # Sanitize: strip PostgREST filter-syntax characters to prevent filter injection
+            safe_search = re.sub(r'[(),.\'"\\]', '', search.strip())[:100]
+            if safe_search:
+                query = query.or_(f'name.ilike.%{safe_search}%,address.ilike.%{safe_search}%')
         
         # Soft delete filter
         query = query.is_('deleted_at', 'null')
@@ -127,10 +130,12 @@ async def list_masjids(
             total_pages=((result.count or 0) + page_size - 1) // page_size
         )
         
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Gagal memuatkan senarai masjid"
         )
 
 
@@ -160,10 +165,10 @@ async def get_masjid_stats(
             "verified_masjids": verified_masjids,
             "total_visits": total_visits,
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Gagal memuatkan statistik"
         )
 
 
@@ -246,10 +251,10 @@ async def get_masjid_detail(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Gagal memuatkan maklumat masjid"
         )
 
 
@@ -340,10 +345,10 @@ async def create_masjid(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Gagal mencipta masjid"
         )
 
 
@@ -360,21 +365,33 @@ async def update_masjid(
     Update masjid info (owner or admin only).
     """
     try:
-        # Check ownership
+        # Check ownership or admin
         masjid = supabase.table('masjids').select('created_by').eq(
             'id', str(masjid_id)
-        ).execute()
+        ).is_('deleted_at', 'null').execute()
         
-        if not masjid.data or masjid.data[0]['created_by'] != current_user['id']:
+        if not masjid.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Masjid tidak dijumpai")
+        
+        is_admin = _is_admin(current_user['id'], supabase)
+        is_owner = masjid.data[0]['created_by'] == current_user['id']
+        if not (is_owner or is_admin):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only update your own masjid"
+                detail="Anda tidak mempunyai kebenaran untuk mengemaskini masjid ini"
             )
         
-        # Update
-        update_data = body.model_dump(exclude_unset=True)
+        # Only allow updating safe content fields — never status/verification_count/created_by
+        ALLOWED_FIELDS = {'name', 'address', 'description', 'latitude', 'longitude'}
+        update_data = {
+            k: v for k, v in body.model_dump(exclude_unset=True).items()
+            if k in ALLOWED_FIELDS
+        }
         if 'latitude' in update_data and 'longitude' in update_data:
             update_data['location'] = f"POINT({update_data.pop('longitude')} {update_data.pop('latitude')})"
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="Tiada data untuk dikemaskini")
         
         result = supabase.table('masjids').update(update_data).eq(
             'id', str(masjid_id)
@@ -384,10 +401,10 @@ async def update_masjid(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Gagal mengemaskini masjid"
         )
 
 
@@ -666,23 +683,33 @@ async def delete_masjid(
     Soft delete masjid (owner or admin only).
     """
     try:
-        # Soft delete by setting deleted_at
-        result = supabase.table('masjids').update({
-            'deleted_at': 'now()'
-        }).eq('id', str(masjid_id)).eq('created_by', current_user['id']).execute()
+        # Verify masjid exists (not already deleted)
+        masjid_res = supabase.table('masjids').select('created_by').eq(
+            'id', str(masjid_id)
+        ).is_('deleted_at', 'null').execute()
         
-        if not result.data:
+        if not masjid_res.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Masjid tidak dijumpai")
+        
+        is_admin = _is_admin(current_user['id'], supabase)
+        is_owner = masjid_res.data[0]['created_by'] == current_user['id']
+        if not (is_owner or is_admin):
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Masjid not found or you don't have permission"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Anda tidak mempunyai kebenaran untuk memadam masjid ini"
             )
         
-        return MessageResponse(message="Masjid deleted successfully", success=True)
+        # Soft delete by setting deleted_at
+        supabase.table('masjids').update({
+            'deleted_at': 'now()'
+        }).eq('id', str(masjid_id)).execute()
+        
+        return MessageResponse(message="Masjid berjaya dipadam", success=True)
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Gagal memadam masjid"
         )
