@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import BrowseMasjid from "./pages/BrowseMasjid";
 import MasjidDetail from "./pages/MasjidDetail";
 import TrackingDashboard from "./pages/TrackingDashboard";
+import AddMasjid from "./pages/AddMasjid";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/browse" element={<BrowseMasjid />} />
             <Route path="/masjid/:id" element={<MasjidDetail />} />
             <Route path="/tracking" element={<TrackingDashboard />} />
+            <Route path="/add-masjid" element={<AddMasjid />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/auth" element={<Auth />} />

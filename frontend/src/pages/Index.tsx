@@ -179,9 +179,9 @@ const Index = () => {
                 Jadilah yang pertama! Tambah masjid yang anda kunjungi dan bantu komuniti.
               </p>
               <Button asChild className="mt-6 rounded-xl font-semibold" size="sm">
-                <Link to="/browse">
+                <Link to="/add-masjid">
                   <MapPin className="mr-2 h-4 w-4" />
-                  Cari Masjid
+                  Tambah Masjid
                 </Link>
               </Button>
             </div>
