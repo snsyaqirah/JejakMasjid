@@ -11,8 +11,11 @@ import MasjidDetail from "./pages/MasjidDetail";
 import TrackingDashboard from "./pages/TrackingDashboard";
 import AddMasjid from "./pages/AddMasjid";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import AdminPanel from "./pages/AdminPanel";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +37,9 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, Link } from "react-router-dom";
-import { ShieldCheck, ExternalLink, CheckCircle2, XCircle, Clock, Loader2, Search } from "lucide-react";
+import { ShieldCheck, ExternalLink, CheckCircle2, XCircle, Clock, Loader2, Search, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,6 +51,7 @@ export default function AdminPanel() {
   const [selected, setSelected] = useState<Report | null>(null);
   const [resolveStatus, setResolveStatus] = useState<string>("");
   const [resolveNotes, setResolveNotes] = useState("");
+  const [activeTab, setActiveTab] = useState<"reports" | "media">("reports");
 
   // Check admin‑gated fetch — redirect if not admin
   const { data: profile, isLoading: loadingProfile } = useQuery({
@@ -74,6 +75,24 @@ export default function AdminPanel() {
       setSelected(null);
     },
     onError: () => toast({ title: "Gagal kemaskini", variant: "destructive" }),
+  });
+
+  const { data: pendingMedia, isLoading: loadingMedia } = useQuery({
+    queryKey: ["admin", "pending-media"],
+    queryFn: () => adminApi.listPendingMedia(),
+    enabled: !!profile?.is_admin && activeTab === "media",
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => adminApi.approveMedia(id),
+    onSuccess: () => { toast({ title: "QR diluluskan ✅" }); queryClient.invalidateQueries({ queryKey: ["admin", "pending-media"] }); },
+    onError: () => toast({ title: "Gagal", variant: "destructive" }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => adminApi.rejectMedia(id),
+    onSuccess: () => { toast({ title: "QR ditolak & dipadam" }); queryClient.invalidateQueries({ queryKey: ["admin", "pending-media"] }); },
+    onError: () => toast({ title: "Gagal", variant: "destructive" }),
   });
 
   if (!user || (!loadingProfile && !profile?.is_admin)) {
@@ -110,11 +129,71 @@ export default function AdminPanel() {
           </div>
           <div>
             <h1 className="font-serif text-2xl font-bold">Panel Admin</h1>
-            <p className="text-sm text-muted-foreground">Urus laporan dari pengguna</p>
+            <p className="text-sm text-muted-foreground">Urus laporan & semak QR</p>
           </div>
         </div>
 
-        {/* Summary chips */}
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 border-b">
+          <button
+            onClick={() => setActiveTab("reports")}
+            className={`flex items-center gap-2 pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === "reports" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            <ShieldCheck className="h-4 w-4" /> Laporan
+            {reports && reports.length > 0 && <span className="rounded-full bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5">{reports.filter((r: Report) => r.status === "pending").length}</span>}
+          </button>
+          <button
+            onClick={() => setActiveTab("media")}
+            className={`flex items-center gap-2 pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === "media" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            <QrCode className="h-4 w-4" /> Semak QR
+            {pendingMedia && pendingMedia.length > 0 && <span className="rounded-full bg-amber-500 text-white text-xs px-1.5 py-0.5">{pendingMedia.length}</span>}
+          </button>
+        </div>
+
+        {/* ── Media Review Tab ── */}
+        {activeTab === "media" && (
+          <div>
+            {loadingMedia ? (
+              <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            ) : !pendingMedia || pendingMedia.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">
+                <QrCode className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                Tiada QR menunggu semakan
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">{pendingMedia.length} QR menunggu kelulusan admin sebelum ditunjukkan kepada pengguna.</p>
+                {pendingMedia.map((item) => (
+                  <div key={item.id} className="rounded-xl border bg-card p-4 flex items-start gap-4">
+                    <img src={item.url} alt="QR" className="h-24 w-24 rounded-xl object-contain border flex-shrink-0 bg-white" onError={(e) => { (e.currentTarget as HTMLImageElement).src = ""; }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{item.masjid_name ?? "Masjid tidak diketahui"}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Jenis: <span className="font-medium">{item.media_type === "qr_tng" ? "QR TNG" : "QR DuitNow"}</span></p>
+                      <Link to={item.url} target="_blank" className="text-xs text-primary flex items-center gap-1 mt-1 hover:underline">
+                        <ExternalLink className="h-3 w-3" /> Lihat URL penuh
+                      </Link>
+                      <Link to={`/masjid/${item.masjid_id}`} target="_blank" className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 hover:underline">
+                        <ExternalLink className="h-3 w-3" /> Buka halaman masjid
+                      </Link>
+                    </div>
+                    <div className="flex flex-col gap-2 flex-shrink-0">
+                      <Button size="sm" className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveMutation.mutate(item.id)} disabled={approveMutation.isPending}>
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Luluskan
+                      </Button>
+                      <Button size="sm" variant="destructive" className="gap-1" onClick={() => rejectMutation.mutate(item.id)} disabled={rejectMutation.isPending}>
+                        <XCircle className="h-3.5 w-3.5" /> Tolak
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Reports Tab ── */}
+        {activeTab === "reports" && (<>
         <div className="mb-5 flex flex-wrap gap-2">
           {(["all", "pending", "reviewing", "resolved", "dismissed"] as const).map((s) => (
             <button
@@ -221,6 +300,7 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+        </>)}
       </div>
       <Footer />
 

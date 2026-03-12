@@ -1,4 +1,5 @@
-import { Moon, Calendar, MapPin, TrendingUp, Trophy, Map, Loader2, PlusCircle } from "lucide-react";
+import { useState } from "react";
+import { Moon, Calendar, MapPin, TrendingUp, Trophy, Loader2, PlusCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,12 @@ const TrackingDashboard = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/auth" replace />;
 
+  const [calendarDate, setCalendarDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+
   const { data: stats, isLoading: loadingStats } = useQuery({
     queryKey: ["dashboard", "stats"],
     queryFn: () => dashboardApi.stats(),
@@ -27,18 +34,43 @@ const TrackingDashboard = () => {
   const s = stats as UserStats | undefined;
   const h = history as VisitHistory | undefined;
 
-  const visitedStates = new Set<string>();
-  // We don't have state data per visit from the API, so show empty for now
-
-  // 30-day activity from visit history
-  const today = new Date();
   const visitDates = new Set((h?.visits ?? []).map((v: Visit) => v.visit_date?.split("T")[0]));
-  const days = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (29 - i));
-    const dateStr = d.toISOString().split("T")[0];
-    return { date: d, dateStr, hasVisit: visitDates.has(dateStr) };
-  });
+
+  // Longest streak (computed client-side from visit dates)
+  const longestStreak = (() => {
+    const sorted = [...visitDates].filter(Boolean).sort() as string[];
+    let best = 0, cur = 0, prev: string | null = null;
+    for (const d of sorted) {
+      if (prev) {
+        const diff = (new Date(d).getTime() - new Date(prev).getTime()) / 86_400_000;
+        cur = diff === 1 ? cur + 1 : 1;
+      } else {
+        cur = 1;
+      }
+      if (cur > best) best = cur;
+      prev = d;
+    }
+    return best;
+  })();
+
+  // Visit type breakdown
+  const visitTypeCounts = (h?.visits ?? []).reduce((acc: Record<string, number>, v: Visit) => {
+    acc[v.visit_type] = (acc[v.visit_type] ?? 0) + 1;
+    return acc;
+  }, {});
+  const totalVisits = Object.values(visitTypeCounts).reduce((a, b) => a + b, 0);
+
+  // Calendar helpers
+  const calYear = calendarDate.getFullYear();
+  const calMonth = calendarDate.getMonth();
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const MONTH_NAMES_MY = ["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"];
+  const DAY_NAMES_MY   = ["Ahd","Isn","Sel","Rab","Kha","Jum","Sab"];
+
+  const prevMonth = () => setCalendarDate(new Date(calYear, calMonth - 1, 1));
+  const nextMonth = () => setCalendarDate(new Date(calYear, calMonth + 1, 1));
+  const isCurrentMonth = calYear === new Date().getFullYear() && calMonth === new Date().getMonth();
 
   const isLoading = loadingStats || loadingHistory;
 
@@ -78,12 +110,13 @@ const TrackingDashboard = () => {
         ) : (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 mb-8">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-5 mb-8">
               {[
-                { label: "Jumlah Kunjungan", value: s?.total_visits ?? 0, icon: TrendingUp, color: "text-primary" },
-                { label: "Masjid Dikunjungi", value: h?.unique_masjids ?? 0, icon: MapPin, color: "text-accent" },
-                { label: "Streak Sekarang", value: h?.current_streak ?? 0, icon: Calendar, color: "text-primary" },
-                { label: "Mata Reputasi", value: s?.reputation_points ?? 0, icon: Trophy, color: "text-accent" },
+                { label: "Jumlah Kunjungan",  value: s?.total_visits ?? 0,     icon: TrendingUp, color: "text-primary" },
+                { label: "Masjid Dikunjungi",  value: h?.unique_masjids ?? 0,  icon: MapPin,     color: "text-accent" },
+                { label: "Streak Sekarang",    value: h?.current_streak ?? 0,  icon: Calendar,   color: "text-primary" },
+                { label: "Streak Terpanjang",  value: longestStreak,           icon: Trophy,     color: "text-accent" },
+                { label: "Mata Reputasi",      value: s?.reputation_points ?? 0, icon: Trophy,   color: "text-primary" },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border bg-card p-5">
                   <stat.icon className={`h-5 w-5 ${stat.color} mb-2`} />
@@ -116,25 +149,106 @@ const TrackingDashboard = () => {
               </div>
             )}
 
-            {/* Activity Calendar */}
-            <div className="rounded-2xl border bg-card p-6 mb-8">
-              <h3 className="font-serif text-lg font-semibold mb-4">Aktiviti 30 Hari</h3>
-              <div className="grid grid-cols-10 gap-2">
-                {days.map((day) => (
-                  <div
-                    key={day.dateStr}
-                    className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium transition-colors ${
-                      day.hasVisit
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground"
-                    }`}
-                    title={`${day.dateStr}${day.hasVisit ? " — Ada kunjungan" : ""}`}
-                  >
-                    {day.date.getDate()}
-                  </div>
+            {/* Calendar + Visit Type Breakdown — 2 col on md+ */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Activity Calendar */}
+              <div className="rounded-2xl border bg-card p-4">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <h3 className="font-serif text-base font-semibold">Kalendar Aktiviti</h3>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <button onClick={prevMonth} className="rounded-md p-1 hover:bg-secondary transition-colors" aria-label="Bulan sebelum">
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="min-w-[110px] text-center text-xs font-medium tabular-nums">
+                    {MONTH_NAMES_MY[calMonth]} {calYear}
+                  </span>
+                  <button onClick={nextMonth} disabled={isCurrentMonth} className="rounded-md p-1 hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed" aria-label="Bulan berikut">
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Day name headers */}
+              <div className="grid grid-cols-7 mb-1">
+                {DAY_NAMES_MY.map((d) => (
+                  <div key={d} className="text-center text-[10px] font-medium text-muted-foreground py-0.5">{d}</div>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-muted-foreground">Warna = ada check-in hari tu</p>
+
+              {/* Calendar grid */}
+              <div className="grid grid-cols-7 gap-0.5">
+                {/* Leading empty cells */}
+                {Array.from({ length: firstDay }).map((_, i) => (
+                  <div key={`empty-${i}`} />
+                ))}
+                {/* Day cells */}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const day = i + 1;
+                  const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                  const hasVisit = visitDates.has(dateStr);
+                  const isToday = dateStr === new Date().toISOString().split("T")[0];
+                  return (
+                    <div
+                      key={day}
+                      title={hasVisit ? `${dateStr} — Ada check-in` : dateStr}
+                      className={`aspect-square rounded-md flex items-center justify-center text-[11px] font-medium transition-colors
+                        ${hasVisit ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}
+                        ${isToday && !hasVisit ? "ring-1 ring-primary/50" : ""}
+                      `}
+                    >
+                      {day}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="mt-3 flex items-center gap-3 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded bg-primary inline-block" /> Ada check-in</span>
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded ring-1 ring-primary/50 inline-block" /> Hari ini</span>
+              </div>
+            </div>
+
+              {/* Visit Type Breakdown */}
+              <div className="rounded-2xl border bg-card p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <h3 className="font-serif text-base font-semibold">Pecahan Jenis Kunjungan</h3>
+                </div>
+                {totalVisits === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm">
+                    <MapPin className="h-8 w-8 opacity-20 mb-2" />
+                    Belum ada kunjungan
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {Object.entries(visitTypeCounts)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([type, count]) => {
+                        const pct = Math.round((count / totalVisits) * 100);
+                        return (
+                          <div key={type}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-foreground">{VISIT_TYPE_LABELS[type] ?? type}</span>
+                              <span className="text-xs text-muted-foreground tabular-nums">{count}x · {pct}%</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-primary transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    <p className="text-xs text-muted-foreground pt-1">Jumlah: {totalVisits} kunjungan</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Favourite Masjid */}

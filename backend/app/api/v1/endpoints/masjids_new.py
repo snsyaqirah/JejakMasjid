@@ -422,14 +422,41 @@ async def add_masjid_media(
     if not masjid_res.data:
         raise HTTPException(status_code=404, detail="Masjid tidak dijumpai")
 
-    if not body.url.startswith(('http://', 'https://')):
-        raise HTTPException(status_code=422, detail="URL gambar tidak sah")
+    if not body.url.startswith('https://'):
+        raise HTTPException(status_code=422, detail="URL mesti bermula dengan https://")
+
+    # QR codes require minimum reputation (prevent fraud)
+    QR_TYPES = {'qr_tng', 'qr_duitnow'}
+    if body.media_type in QR_TYPES:
+        prof_res = supabase.table('profiles').select('reputation_points').eq(
+            'id', current_user['id']
+        ).single().execute()
+        rep = prof_res.data.get('reputation_points', 0) if prof_res.data else 0
+        if rep < 30:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Anda memerlukan sekurang-kurangnya 30 mata reputasi untuk submit QR code. Anda ada {rep} mata."
+            )
+
+    # Rate limit: max 3 media uploads per user per masjid (across all types)
+    recent_res = supabase.table('masjid_media').select('id', count='exact').eq(
+        'masjid_id', masjid_id_str
+    ).eq('created_by', current_user['id']).is_('deleted_at', 'null').execute()
+    if (recent_res.count or 0) >= 3:
+        raise HTTPException(
+            status_code=429,
+            detail="Had maksimum 3 media setiap masjid telah dicapai untuk akaun anda."
+        )
+
+    # QR codes start unverified and need admin approval before being shown
+    is_verified = body.media_type not in QR_TYPES
 
     result = supabase.table('masjid_media').insert({
         'masjid_id': masjid_id_str,
         'media_type': body.media_type,
         'url': body.url,
         'created_by': current_user['id'],
+        'is_verified': is_verified,
     }).execute()
 
     if not result.data:
@@ -466,6 +493,73 @@ async def delete_masjid_media(
         raise HTTPException(status_code=404, detail="Gambar tidak dijumpai atau tiada kebenaran")
 
     return MessageResponse(message="Gambar dipadam", success=True)
+
+
+# ── Admin: Media Moderation ──────────────────────────────────────────
+
+def _is_admin(user_id: str, supabase: Client) -> bool:
+    res = supabase.table('profiles').select('is_admin').eq('id', user_id).single().execute()
+    return bool(res.data and res.data.get('is_admin'))
+
+
+@router.get("/admin/pending-media")
+async def list_pending_media(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_admin),
+):
+    """Admin only: list all unverified QR media awaiting review."""
+    if not _is_admin(current_user['id'], supabase):
+        raise HTTPException(status_code=403, detail="Admin sahaja")
+
+    result = supabase.table('masjid_media').select(
+        '*, masjids:masjid_id(name)'
+    ).eq('is_verified', False).is_('deleted_at', 'null').in_(
+        'media_type', ['qr_tng', 'qr_duitnow']
+    ).order('created_at').execute()
+
+    items = []
+    for row in (result.data or []):
+        items.append({
+            **row,
+            'masjid_name': row.get('masjids', {}).get('name') if row.get('masjids') else None,
+        })
+    return items
+
+
+@router.patch("/admin/media/{media_id}/approve")
+async def approve_media(
+    media_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_admin),
+):
+    """Admin only: approve a pending media item."""
+    if not _is_admin(current_user['id'], supabase):
+        raise HTTPException(status_code=403, detail="Admin sahaja")
+
+    result = supabase.table('masjid_media').update({'is_verified': True}).eq(
+        'id', str(media_id)
+    ).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Media tidak dijumpai")
+    return {"success": True}
+
+
+@router.delete("/admin/media/{media_id}/reject")
+async def reject_media(
+    media_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_admin),
+):
+    """Admin only: reject (soft-delete) a pending media item."""
+    if not _is_admin(current_user['id'], supabase):
+        raise HTTPException(status_code=403, detail="Admin sahaja")
+
+    result = supabase.table('masjid_media').update({'deleted_at': 'now()'}).eq(
+        'id', str(media_id)
+    ).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Media tidak dijumpai")
+    return {"success": True}
 
 
 @router.delete("/{masjid_id}", response_model=MessageResponse)

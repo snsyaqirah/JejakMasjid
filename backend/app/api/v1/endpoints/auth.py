@@ -11,7 +11,8 @@ from app.schemas.auth import (
     SignUpRequest, SignUpResponse,
     VerifyOTPRequest, VerifyOTPResponse,
     LoginRequest, LoginResponse,
-    RefreshTokenRequest, ResendOTPRequest
+    RefreshTokenRequest, ResendOTPRequest,
+    ForgotPasswordRequest, UpdatePasswordRequest,
 )
 from app.schemas.common import MessageResponse
 
@@ -247,3 +248,41 @@ async def get_current_user_info(
     Get current authenticated user info.
     """
     return current_user
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    supabase: Client = Depends(get_supabase)
+):
+    """
+    Send password reset email. Always returns success to avoid user enumeration.
+    Supabase redirects to redirect_to/reset-password with #access_token in URL fragment.
+    """
+    from app.core.config import settings
+    default_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password" if settings.FRONTEND_URL else "https://jejakmasjid.vercel.app/reset-password"
+    # Use the redirect URL sent by the frontend (based on window.location.origin)
+    # so it works for both localhost and production.
+    redirect_url = body.redirect_to or default_url
+    try:
+        supabase.auth.reset_password_for_email(body.email, {"redirect_to": redirect_url})
+    except Exception:
+        pass  # Don't reveal whether email exists
+    return MessageResponse(message="Emel tetapan semula telah dihantar jika akaun wujud", success=True)
+
+
+@router.post("/update-password", response_model=MessageResponse)
+async def update_password(
+    body: UpdatePasswordRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Update password. Requires valid recovery token in Authorization header.
+    """
+    try:
+        from app.core.supabase import get_supabase_admin
+        admin = get_supabase_admin()
+        admin.auth.admin.update_user_by_id(current_user["id"], {"password": body.new_password})
+        return MessageResponse(message="Kata laluan berjaya dikemaskini", success=True)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

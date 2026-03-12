@@ -100,6 +100,7 @@ const MasjidDetail = () => {
   const [mediaOpen, setMediaOpen] = useState(false);
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("main_photo");
+  const [qrConfirmed, setQrConfirmed] = useState(false);
   // Facilities sheet
   const [facOpen, setFacOpen] = useState(false);
   const [facForm, setFacForm] = useState(defaultFacForm);
@@ -228,7 +229,7 @@ const MasjidDetail = () => {
     mutationFn: () => mediaApi.add(masjid!.id, { media_type: mediaType, url: mediaUrl }),
     onSuccess: () => {
       toast({ title: "Gambar ditambah! 📸" });
-      setMediaOpen(false); setMediaUrl(""); setMediaType("main_photo");
+      setMediaOpen(false); setMediaUrl(""); setMediaType("main_photo"); setQrConfirmed(false);
       refetchMedia();
     },
     onError: (e) => {
@@ -373,7 +374,10 @@ const MasjidDetail = () => {
   const isVerified = m.status === "verified";
   const live = liveStatus as LiveStatus | undefined;
   const photos = (mediaItems ?? []).filter((i) => ["main_photo", "interior_photo", "toilet_photo"].includes(i.media_type));
-  const qrItems = (mediaItems ?? []).filter((i) => ["qr_tng", "qr_duitnow", "masjid_board"].includes(i.media_type));
+  const allQrItems = (mediaItems ?? []).filter((i) => ["qr_tng", "qr_duitnow", "masjid_board"].includes(i.media_type));
+  // Only show verified QRs to public; uploader can see their own pending ones
+  const qrItems = allQrItems.filter((i) => i.is_verified || i.created_by === user?.id);
+  const pendingQrCount = allQrItems.filter((i) => !i.is_verified && i.created_by === user?.id).length;
   const mainPhoto = photos.find((i) => i.media_type === "main_photo");
 
   return (
@@ -602,15 +606,26 @@ const MasjidDetail = () => {
             {/* QR / Documents */}
             {qrItems.length > 0 && (
               <div className="rounded-2xl border bg-card p-6">
-                <h3 className="font-serif text-lg font-semibold mb-4">QR & Papan Info</h3>
+                <h3 className="font-serif text-lg font-semibold mb-1">QR & Papan Info</h3>
+                <p className="text-xs text-muted-foreground mb-4">Sila semak QR dengan teliti sebelum scan. JejakMasjid tidak bertanggungjawab atas sebarang transaksi.</p>
                 <div className="flex gap-3 flex-wrap">
                   {qrItems.map((q) => (
-                    <div key={q.id} className="text-center">
-                      <img src={q.url} alt={MEDIA_LABELS[q.media_type as MediaType]} className="h-24 w-24 rounded-xl object-contain border" />
+                    <div key={q.id} className="text-center relative">
+                      {!q.is_verified ? (
+                        <div className="h-24 w-24 rounded-xl border border-dashed border-amber-400 bg-amber-50 flex flex-col items-center justify-center gap-1">
+                          <span className="text-lg">🕐</span>
+                          <p className="text-xs text-amber-700 font-medium">Menunggu<br/>semakan</p>
+                        </div>
+                      ) : (
+                        <img src={q.url} alt={MEDIA_LABELS[q.media_type as MediaType]} className="h-24 w-24 rounded-xl object-contain border" />
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">{MEDIA_LABELS[q.media_type as MediaType]}</p>
                     </div>
                   ))}
                 </div>
+                {pendingQrCount > 0 && (
+                  <p className="text-xs text-amber-600 mt-3">⏳ {pendingQrCount} QR anda sedang menunggu semakan admin.</p>
+                )}
               </div>
             )}
 
@@ -793,7 +808,7 @@ const MasjidDetail = () => {
       </Dialog>
 
       {/* ── Add Media Dialog ── */}
-      <Dialog open={mediaOpen} onOpenChange={setMediaOpen}>
+      <Dialog open={mediaOpen} onOpenChange={(o) => { setMediaOpen(o); if (!o) { setMediaUrl(""); setMediaType("main_photo"); setQrConfirmed(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Tambah Gambar / QR</DialogTitle>
@@ -801,7 +816,7 @@ const MasjidDetail = () => {
           <div className="space-y-4 py-2">
             <div>
               <Label>Jenis</Label>
-              <Select value={mediaType} onValueChange={(v) => setMediaType(v as MediaType)}>
+              <Select value={mediaType} onValueChange={(v) => { setMediaType(v as MediaType); setQrConfirmed(false); }}>
                 <SelectTrigger className="mt-1.5 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
@@ -812,27 +827,63 @@ const MasjidDetail = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* QR-specific warning */}
+            {(mediaType === "qr_tng" || mediaType === "qr_duitnow") && (
+              <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <div>
+                    <p className="text-sm font-semibold text-destructive">Amaran Keselamatan — QR Code</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      QR palsu boleh menyebabkan orang tertipu. Semua QR yang dihantar akan disemak oleh admin sebelum dipaparkan. Akaun yang menghantar QR tidak sah akan diblok.
+                    </p>
+                  </div>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={qrConfirmed}
+                    onCheckedChange={(c) => setQrConfirmed(!!c)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-xs font-medium">
+                    Saya sahkan ini adalah QR rasmi masjid ini dan bukan QR peribadi atau pihak lain.
+                  </span>
+                </label>
+              </div>
+            )}
+
             <div>
-              <Label>URL Gambar</Label>
+              <Label>URL {(mediaType === "qr_tng" || mediaType === "qr_duitnow") ? "Gambar QR" : "Gambar"}</Label>
               <Input
                 value={mediaUrl}
                 onChange={(e) => setMediaUrl(e.target.value)}
                 placeholder="https://..."
                 className="mt-1.5 rounded-xl"
               />
-              <p className="text-xs text-muted-foreground mt-1">Paste URL gambar yang anda upload (Imgur, Google Drive, dll)</p>
+              <p className="text-xs text-muted-foreground mt-1">Mesti bermula https://. Guna Imgur atau Google Drive untuk host gambar.</p>
             </div>
-            {mediaUrl.startsWith("http") && (
+            {mediaUrl.startsWith("https://") && (
               <img src={mediaUrl} alt="preview" className="rounded-xl max-h-40 object-cover w-full" onError={(e) => (e.currentTarget.style.display = "none")} />
+            )}
+
+            {(mediaType === "qr_tng" || mediaType === "qr_duitnow") && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                🕐 QR akan disemak admin dahulu sebelum dipaparkan kepada pengguna lain.
+              </p>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMediaOpen(false)}>Batal</Button>
             <Button
               onClick={() => mediaMutation.mutate()}
-              disabled={!mediaUrl.startsWith("http") || mediaMutation.isPending}
+              disabled={
+                !mediaUrl.startsWith("https://") ||
+                mediaMutation.isPending ||
+                ((mediaType === "qr_tng" || mediaType === "qr_duitnow") && !qrConfirmed)
+              }
             >
-              {mediaMutation.isPending ? "Menyimpan..." : "Simpan"}
+              {mediaMutation.isPending ? "Menyimpan..." : "Hantar"}
             </Button>
           </DialogFooter>
         </DialogContent>

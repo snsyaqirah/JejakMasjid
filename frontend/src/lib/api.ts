@@ -138,6 +138,22 @@ export const authApi = {
     request<{ id: string; email: string; user_metadata: Record<string, unknown> }>(
       "/api/v1/auth/me"
     ),
+
+  forgotPassword: (email: string) =>
+    request<{ message: string }>("/api/v1/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        redirectTo: `${window.location.origin}/reset-password`,
+      }),
+    }),
+
+  updatePassword: (newPassword: string, accessToken: string) =>
+    request<{ message: string }>("/api/v1/auth/update-password", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ newPassword }),
+    }),
 };
 
 export function userFromMeta(raw: {
@@ -400,5 +416,16 @@ export const adminApi = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  listPendingMedia: () =>
+    request<Array<{ id: string; masjid_id: string; media_type: string; url: string; created_at: string; masjid_name?: string }>>(
+      "/api/v1/masjids/admin/pending-media"
+    ),
+
+  approveMedia: (mediaId: string) =>
+    request<{ success: boolean }>(`/api/v1/masjids/admin/media/${mediaId}/approve`, { method: "PATCH" }),
+
+  rejectMedia: (mediaId: string) =>
+    request<{ success: boolean }>(`/api/v1/masjids/admin/media/${mediaId}/reject`, { method: "DELETE" }),
 };
 

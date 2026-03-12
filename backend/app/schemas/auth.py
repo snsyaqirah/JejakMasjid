@@ -65,3 +65,15 @@ class RefreshTokenRequest(CamelModel):
 class ResendOTPRequest(CamelModel):
     """Resend verification code to email."""
     email: EmailStr
+
+
+# ── Forgot / Reset Password ──────────────────────────────────────────
+class ForgotPasswordRequest(CamelModel):
+    """Send password reset email."""
+    email: EmailStr
+    redirect_to: str | None = None  # Frontend passes its own origin
+
+
+class UpdatePasswordRequest(CamelModel):
+    """Update password using recovery token already set in session."""
+    new_password: str = Field(min_length=8)

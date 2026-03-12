@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
-type Step = "login" | "signup" | "otp";
+type Step = "login" | "signup" | "otp" | "forgot" | "forgot-sent";
 
 const pwdRules = [
   { key: "len",     label: "Sekurang-kurangnya 8 aksara",  test: (p: string) => p.length >= 8 },
@@ -94,6 +94,20 @@ const Auth = () => {
         return s - 1;
       });
     }, 1000);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await authApi.forgotPassword(email);
+      setStep("forgot-sent");
+    } catch {
+      // Always show success to avoid email enumeration
+      setStep("forgot-sent");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -304,11 +318,57 @@ const Auth = () => {
                     {loading ? "Memuatkan..." : "Log Masuk"}
                   </Button>
                 </form>
-                <p className="mt-4 text-center text-sm text-muted-foreground">
-                  Belum ada akaun?{" "}
-                  <button type="button" onClick={() => setStep("signup")} className="text-primary underline">Daftar sekarang</button>
-                </p>
+                <div className="mt-4 space-y-2 text-center">
+                  <button type="button" onClick={() => setStep("forgot")} className="text-sm text-muted-foreground hover:text-foreground underline block w-full">
+                    Lupa kata laluan?
+                  </button>
+                  <p className="text-sm text-muted-foreground">
+                    Belum ada akaun?{" "}
+                    <button type="button" onClick={() => setStep("signup")} className="text-primary underline">Daftar sekarang</button>
+                  </p>
+                </div>
               </>
+            )}
+
+            {/* ── Forgot Password Step ── */}
+            {step === "forgot" && (
+              <>
+                <button type="button" onClick={() => setStep("login")} className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                  <ArrowLeft className="h-4 w-4" /> Kembali
+                </button>
+                <div className="mb-6 text-center">
+                  <KeyRound className="mx-auto h-10 w-10 text-primary mb-3" />
+                  <h2 className="font-serif text-xl font-semibold">Lupa Kata Laluan?</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Masukkan email anda dan kami akan hantar pautan untuk tetapkan semula kata laluan.</p>
+                </div>
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <Label htmlFor="forgotEmail">Email</Label>
+                    <Input id="forgotEmail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@email.com" className="mt-1.5" required />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Menghantar..." : "Hantar Pautan Tetapan Semula"}
+                  </Button>
+                </form>
+              </>
+            )}
+
+            {/* ── Forgot Sent Step ── */}
+            {step === "forgot-sent" && (
+              <div className="text-center space-y-4">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <Check className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="font-serif text-xl font-semibold">Semak Email Anda</h2>
+                <p className="text-sm text-muted-foreground">
+                  Kami telah hantar pautan tetapan semula ke <strong>{email || "email anda"}</strong>.
+                  Pautan sah selama 1 jam.
+                </p>
+                <p className="text-xs text-muted-foreground">Tak jumpa? Semak folder Spam/Junk.</p>
+                <Button variant="outline" className="w-full mt-2" onClick={() => setStep("login")}>
+                  Kembali ke Log Masuk
+                </Button>
+              </div>
             )}
 
             {/* ── Signup Step ── */}
