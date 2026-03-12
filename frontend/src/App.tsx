@@ -30,7 +30,7 @@ const App = () => (
             <Route path="/browse" element={<BrowseMasjid />} />
             <Route path="/masjid/:id" element={<MasjidDetail />} />
             <Route path="/tracking" element={<TrackingDashboard />} />
-            <Route path="/add-masjid" element={<AddMasjid />} />
+            <Route path="/add" element={<AddMasjid />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/auth" element={<Auth />} />
