@@ -298,13 +298,13 @@ export type MediaType = "main_photo" | "toilet_photo" | "interior_photo" | "qr_t
 
 export interface MediaItem {
   id: string;
-  masjid_id: string;
-  media_type: MediaType;
+  masjidId: string;
+  mediaType: MediaType;
   url: string;
-  is_verified: boolean;
-  verification_count: number;
-  created_at: string;
-  created_by: string | null;
+  isVerified: boolean;
+  verificationCount: number;
+  createdAt: string;
+  createdBy: string | null;
 }
 
 export const mediaApi = {
@@ -319,6 +319,23 @@ export const mediaApi = {
 
   remove: (masjidId: string, mediaId: string) =>
     request(`/api/v1/masjids/${masjidId}/media/${mediaId}`, { method: "DELETE" }),
+
+  upload: async (masjidId: string, file: File, mediaType: MediaType): Promise<MediaItem> => {
+    const token = getAccessToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("media_type", mediaType);
+    const res = await fetch(`${BASE_URL}/api/v1/masjids/${masjidId}/media/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Upload gagal" }));
+      throw new ApiError(res.status, err.detail ?? "Upload gagal");
+    }
+    return res.json();
+  },
 };
 
 // ── Live Updates ──────────────────────────────────────────────────

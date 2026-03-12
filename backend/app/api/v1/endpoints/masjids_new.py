@@ -6,7 +6,7 @@ import uuid
 import struct
 import unicodedata
 from typing import Literal
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from pydantic import BaseModel
 from supabase import Client
 from app.core.supabase import get_supabase, get_supabase_admin
@@ -493,6 +493,100 @@ async def delete_masjid_media(
         raise HTTPException(status_code=404, detail="Gambar tidak dijumpai atau tiada kebenaran")
 
     return MessageResponse(message="Gambar dipadam", success=True)
+
+
+@router.post("/{masjid_id}/media/upload", response_model=MasjidMediaResponse, status_code=201)
+async def upload_masjid_media(
+    masjid_id: uuid.UUID,
+    file: UploadFile = File(...),
+    media_type: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_admin),
+):
+    """Upload an image file directly to Supabase Storage. Awards +5 reputation."""
+    masjid_id_str = str(masjid_id)
+
+    VALID_TYPES = ["main_photo", "toilet_photo", "interior_photo", "qr_tng", "qr_duitnow", "masjid_board"]
+    if media_type not in VALID_TYPES:
+        raise HTTPException(status_code=422, detail="Jenis media tidak sah")
+
+    masjid_res = supabase.table('masjids').select('id').eq(
+        'id', masjid_id_str
+    ).is_('deleted_at', 'null').execute()
+    if not masjid_res.data:
+        raise HTTPException(status_code=404, detail="Masjid tidak dijumpai")
+
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=422, detail="Hanya fail imej dibenarkan (JPG, PNG, WebP)")
+
+    file_bytes = await file.read()
+    MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+    if len(file_bytes) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="Saiz fail terlalu besar. Had maksimum ialah 5MB.")
+
+    QR_TYPES = {'qr_tng', 'qr_duitnow'}
+    if media_type in QR_TYPES:
+        prof_res = supabase.table('profiles').select('reputation_points').eq(
+            'id', current_user['id']
+        ).single().execute()
+        rep = prof_res.data.get('reputation_points', 0) if prof_res.data else 0
+        if rep < 30:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Anda memerlukan sekurang-kurangnya 30 mata reputasi untuk submit QR code. Anda ada {rep} mata."
+            )
+
+    recent_res = supabase.table('masjid_media').select('id', count='exact').eq(
+        'masjid_id', masjid_id_str
+    ).eq('created_by', current_user['id']).is_('deleted_at', 'null').execute()
+    if (recent_res.count or 0) >= 3:
+        raise HTTPException(
+            status_code=429,
+            detail="Had maksimum 3 media setiap masjid telah dicapai untuk akaun anda."
+        )
+
+    ext = (file.filename or "image.jpg").rsplit(".", 1)[-1].lower()
+    if ext not in ("jpg", "jpeg", "png", "webp", "heic", "heif"):
+        ext = "jpg"
+    file_path = f"{masjid_id_str}/{uuid.uuid4()}.{ext}"
+
+    try:
+        supabase.storage.from_("masjid-media").upload(
+            path=file_path,
+            file=file_bytes,
+            file_options={"content-type": content_type, "upsert": "false"},
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Gagal muat naik gambar ke storan. Cuba lagi.")
+
+    public_url = supabase.storage.from_("masjid-media").get_public_url(file_path)
+
+    is_verified = media_type not in QR_TYPES
+
+    result = supabase.table('masjid_media').insert({
+        'masjid_id': masjid_id_str,
+        'media_type': media_type,
+        'url': public_url,
+        'created_by': current_user['id'],
+        'is_verified': is_verified,
+    }).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Gagal menyimpan maklumat gambar")
+
+    try:
+        prof = supabase.table('profiles').select('reputation_points').eq(
+            'id', current_user['id']
+        ).single().execute()
+        pts = prof.data.get('reputation_points', 0) if prof.data else 0
+        supabase.table('profiles').update({'reputation_points': pts + 5}).eq(
+            'id', current_user['id']
+        ).execute()
+    except Exception:
+        pass
+
+    return result.data[0]
 
 
 # ── Admin: Media Moderation ──────────────────────────────────────────

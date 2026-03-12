@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   MapPin, CheckCircle, ArrowLeft, Users, Wind, Cat,
@@ -98,9 +98,12 @@ const MasjidDetail = () => {
   const [downvoteReason, setDownvoteReason] = useState("");
   // Media dialog
   const [mediaOpen, setMediaOpen] = useState(false);
-  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState("");
   const [mediaType, setMediaType] = useState<MediaType>("main_photo");
   const [qrConfirmed, setQrConfirmed] = useState(false);
+  const [photoConfirmed, setPhotoConfirmed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Facilities sheet
   const [facOpen, setFacOpen] = useState(false);
   const [facForm, setFacForm] = useState(defaultFacForm);
@@ -225,11 +228,25 @@ const MasjidDetail = () => {
     },
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+    setMediaFile(file);
+    setMediaPreview(URL.createObjectURL(file));
+    // Reset so the same file can be re-selected if needed
+    e.target.value = "";
+  };
+
   const mediaMutation = useMutation({
-    mutationFn: () => mediaApi.add(masjid!.id, { media_type: mediaType, url: mediaUrl }),
+    mutationFn: () => {
+      if (!mediaFile) throw new Error("Sila pilih gambar terlebih dahulu");
+      return mediaApi.upload(masjid!.id, mediaFile, mediaType);
+    },
     onSuccess: () => {
       toast({ title: "Gambar ditambah! 📸" });
-      setMediaOpen(false); setMediaUrl(""); setMediaType("main_photo"); setQrConfirmed(false);
+      if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+      setMediaOpen(false); setMediaFile(null); setMediaPreview(""); setMediaType("main_photo"); setQrConfirmed(false);
       refetchMedia();
     },
     onError: (e) => {
@@ -373,12 +390,12 @@ const MasjidDetail = () => {
   const f = (facilitiesData as Facilities | null) ?? null;
   const isVerified = m.status === "verified";
   const live = liveStatus as LiveStatus | undefined;
-  const photos = (mediaItems ?? []).filter((i) => ["main_photo", "interior_photo", "toilet_photo"].includes(i.media_type));
-  const allQrItems = (mediaItems ?? []).filter((i) => ["qr_tng", "qr_duitnow", "masjid_board"].includes(i.media_type));
+  const photos = (mediaItems ?? []).filter((i) => ["main_photo", "interior_photo", "toilet_photo"].includes(i.mediaType));
+  const allQrItems = (mediaItems ?? []).filter((i) => ["qr_tng", "qr_duitnow", "masjid_board"].includes(i.mediaType));
   // Only show verified QRs to public; uploader can see their own pending ones
-  const qrItems = allQrItems.filter((i) => i.is_verified || i.created_by === user?.id);
-  const pendingQrCount = allQrItems.filter((i) => !i.is_verified && i.created_by === user?.id).length;
-  const mainPhoto = photos.find((i) => i.media_type === "main_photo");
+  const qrItems = allQrItems.filter((i) => i.isVerified || i.createdBy === user?.id);
+  const pendingQrCount = allQrItems.filter((i) => !i.isVerified && i.createdBy === user?.id).length;
+  const mainPhoto = photos.find((i) => i.mediaType === "main_photo");
 
   return (
     <div className="min-h-screen bg-background">
@@ -417,8 +434,8 @@ const MasjidDetail = () => {
               <div className="flex gap-3 overflow-x-auto pb-1">
                 {photos.map((p) => (
                   <div key={p.id} className="relative flex-shrink-0 group">
-                    <img src={p.url} alt={MEDIA_LABELS[p.media_type as MediaType]} className="h-20 w-32 rounded-xl object-cover border" />
-                    {p.created_by === user?.id && (
+                    <img src={p.url} alt={MEDIA_LABELS[p.mediaType as MediaType]} className="h-20 w-32 rounded-xl object-cover border" />
+                    {p.createdBy === user?.id && (
                       <button
                         onClick={() => mediaDeleteMutation.mutate(p.id)}
                         className="absolute top-1 right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
@@ -426,7 +443,7 @@ const MasjidDetail = () => {
                         <X className="h-3 w-3" />
                       </button>
                     )}
-                    <p className="text-xs text-center text-muted-foreground mt-1">{MEDIA_LABELS[p.media_type as MediaType]}</p>
+                    <p className="text-xs text-center text-muted-foreground mt-1">{MEDIA_LABELS[p.mediaType as MediaType]}</p>
                   </div>
                 ))}
               </div>
@@ -611,15 +628,15 @@ const MasjidDetail = () => {
                 <div className="flex gap-3 flex-wrap">
                   {qrItems.map((q) => (
                     <div key={q.id} className="text-center relative">
-                      {!q.is_verified ? (
+                      {!q.isVerified ? (
                         <div className="h-24 w-24 rounded-xl border border-dashed border-amber-400 bg-amber-50 flex flex-col items-center justify-center gap-1">
                           <span className="text-lg">🕐</span>
                           <p className="text-xs text-amber-700 font-medium">Menunggu<br/>semakan</p>
                         </div>
                       ) : (
-                        <img src={q.url} alt={MEDIA_LABELS[q.media_type as MediaType]} className="h-24 w-24 rounded-xl object-contain border" />
+                        <img src={q.url} alt={MEDIA_LABELS[q.mediaType as MediaType]} className="h-24 w-24 rounded-xl object-contain border" />
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">{MEDIA_LABELS[q.media_type as MediaType]}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{MEDIA_LABELS[q.mediaType as MediaType]}</p>
                     </div>
                   ))}
                 </div>
@@ -808,15 +825,23 @@ const MasjidDetail = () => {
       </Dialog>
 
       {/* ── Add Media Dialog ── */}
-      <Dialog open={mediaOpen} onOpenChange={(o) => { setMediaOpen(o); if (!o) { setMediaUrl(""); setMediaType("main_photo"); setQrConfirmed(false); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+      <Dialog open={mediaOpen} onOpenChange={(o) => {
+        setMediaOpen(o);
+        if (!o) {
+          if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+          setMediaFile(null); setMediaPreview(""); setMediaType("main_photo"); setQrConfirmed(false); setPhotoConfirmed(false);
+        }
+      }}>
+        <DialogContent className="max-w-md flex flex-col gap-0 p-0 max-h-[90dvh]">
+          <DialogHeader className="px-6 pt-6 pb-4 shrink-0">
             <DialogTitle>Tambah Gambar / QR</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
             <div>
               <Label>Jenis</Label>
-              <Select value={mediaType} onValueChange={(v) => { setMediaType(v as MediaType); setQrConfirmed(false); }}>
+              <Select value={mediaType} onValueChange={(v) => { setMediaType(v as MediaType); setQrConfirmed(false); setPhotoConfirmed(false); }}>
                 <SelectTrigger className="mt-1.5 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
@@ -853,18 +878,44 @@ const MasjidDetail = () => {
               </div>
             )}
 
-            <div>
-              <Label>URL {(mediaType === "qr_tng" || mediaType === "qr_duitnow") ? "Gambar QR" : "Gambar"}</Label>
-              <Input
-                value={mediaUrl}
-                onChange={(e) => setMediaUrl(e.target.value)}
-                placeholder="https://..."
-                className="mt-1.5 rounded-xl"
+            {/* File picker */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="cursor-pointer rounded-xl border-2 border-dashed border-border hover:border-primary/50 transition-colors bg-secondary/30 p-6 flex flex-col items-center gap-3"
+            >
+              {mediaPreview ? (
+                <img src={mediaPreview} alt="preview" className="max-h-56 rounded-xl object-contain" />
+              ) : (
+                <>
+                  <Camera className="h-10 w-10 text-muted-foreground/40" />
+                  <p className="text-sm font-medium">Pilih dari Galeri / Ambil Gambar</p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, WebP • Maks 5MB</p>
+                </>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
               />
-              <p className="text-xs text-muted-foreground mt-1">Mesti bermula https://. Guna Imgur atau Google Drive untuk host gambar.</p>
             </div>
-            {mediaUrl.startsWith("https://") && (
-              <img src={mediaUrl} alt="preview" className="rounded-xl max-h-40 object-cover w-full" onError={(e) => (e.currentTarget.style.display = "none")} />
+            {mediaFile && (
+              <p className="text-xs text-muted-foreground text-center truncate">{mediaFile.name}</p>
+            )}
+
+            {/* Photo declaration for non-QR types */}
+            {mediaType !== "qr_tng" && mediaType !== "qr_duitnow" && (
+              <label className="flex items-start gap-2 cursor-pointer rounded-xl border bg-secondary/30 p-3">
+                <Checkbox
+                  checked={photoConfirmed}
+                  onCheckedChange={(c) => setPhotoConfirmed(!!c)}
+                  className="mt-0.5 shrink-0"
+                />
+                <span className="text-xs">
+                  Saya sahkan gambar ini adalah gambar <strong>bahagian masjid</strong> yang berkenaan, bukan gambar peribadi, makanan, atau kandungan lain.
+                </span>
+              </label>
             )}
 
             {(mediaType === "qr_tng" || mediaType === "qr_duitnow") && (
@@ -873,17 +924,19 @@ const MasjidDetail = () => {
               </p>
             )}
           </div>
-          <DialogFooter>
+
+          {/* Sticky footer */}
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="outline" onClick={() => setMediaOpen(false)}>Batal</Button>
             <Button
               onClick={() => mediaMutation.mutate()}
               disabled={
-                !mediaUrl.startsWith("https://") ||
+                !mediaFile ||
                 mediaMutation.isPending ||
-                ((mediaType === "qr_tng" || mediaType === "qr_duitnow") && !qrConfirmed)
+                ((mediaType === "qr_tng" || mediaType === "qr_duitnow") ? !qrConfirmed : !photoConfirmed)
               }
             >
-              {mediaMutation.isPending ? "Menyimpan..." : "Hantar"}
+              {mediaMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memuat naik...</> : "Hantar"}
             </Button>
           </DialogFooter>
         </DialogContent>
