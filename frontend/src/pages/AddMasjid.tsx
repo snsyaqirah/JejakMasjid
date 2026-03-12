@@ -212,7 +212,7 @@ const AddMasjid = () => {
         title: "Masjid berjaya ditambah! 🕌",
         description: `${form.name} kini boleh dilihat oleh komuniti. 3 pengesahan diperlukan.`,
       });
-      navigate(`/masjid/${result.id}`);
+      navigate(`/masjid/${(result as { id: string; slug?: string }).slug ?? (result as { id: string }).id}`);
     } catch (err) {
       toast({
         title: "Gagal tambah masjid",

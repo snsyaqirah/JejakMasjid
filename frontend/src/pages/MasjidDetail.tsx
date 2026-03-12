@@ -82,7 +82,7 @@ const defaultFacForm = {
 };
 
 const MasjidDetail = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: slug } = useParams<{ id: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -106,46 +106,45 @@ const MasjidDetail = () => {
 
   // ── queries ───────────────────────────────────────────────────
   const { data: masjid, isLoading, isError } = useQuery({
-    queryKey: ["masjid", id],
-    queryFn: () => masjidsApi.get(id!),
-    enabled: !!id,
+    queryKey: ["masjid", slug],
+    queryFn: () => masjidsApi.get(slug!),
+    enabled: !!slug,
   });
 
   const { data: liveStatus } = useQuery({
-    queryKey: ["liveStatus", id],
-    queryFn: () => liveUpdatesApi.getStatus(id!),
-    enabled: !!id,
+    queryKey: ["liveStatus", slug],
+    queryFn: () => liveUpdatesApi.getStatus(masjid?.id ?? slug!),
+    enabled: !!masjid?.id,
   });
 
   const { data: verifyStatus, refetch: refetchVerify } = useQuery({
-    queryKey: ["verifyStatus", id],
-    queryFn: () => verificationsApi.getStatus(id!),
-    enabled: !!id,
+    queryKey: ["verifyStatus", slug],
+    queryFn: () => verificationsApi.getStatus(masjid?.id ?? slug!),
+    enabled: !!masjid?.id,
   });
 
   const { data: facilitiesData, refetch: refetchFacilities } = useQuery({
-    queryKey: ["facilities", id],
-    queryFn: () => facilitiesApi.get(id!),
-    enabled: !!id,
+    queryKey: ["facilities", slug],
+    queryFn: () => facilitiesApi.get(masjid!.id),
+    enabled: !!masjid?.id,
   });
 
   const { data: mediaItems, refetch: refetchMedia } = useQuery({
-    queryKey: ["media", id],
-    queryFn: () => mediaApi.get(id!),
-    enabled: !!id,
+    queryKey: ["media", slug],
+    queryFn: () => mediaApi.get(masjid!.id),
+    enabled: !!masjid?.id,
   });
 
   // ── mutations ─────────────────────────────────────────────────
   const voteMutation = useMutation({
     mutationFn: (payload: { voteType: "upvote" | "downvote"; reason?: string }) =>
-      verificationsApi.vote({ masjidId: id!, voteType: payload.voteType, reason: payload.reason }),
+      verificationsApi.vote({ masjidId: masjid!.id, voteType: payload.voteType, reason: payload.reason }),
 
     onMutate: async (payload) => {
-      // Cancel outgoing refetches so they don't overwrite our optimistic update
-      await queryClient.cancelQueries({ queryKey: ["verifyStatus", id] });
-      const previous = queryClient.getQueryData(["verifyStatus", id]);
+      await queryClient.cancelQueries({ queryKey: ["verifyStatus", slug] });
+      const previous = queryClient.getQueryData(["verifyStatus", slug]);
 
-      queryClient.setQueryData(["verifyStatus", id], (old: VerificationStatus | undefined) => {
+      queryClient.setQueryData(["verifyStatus", slug], (old: VerificationStatus | undefined) => {
         if (!old) return old;
         const wasThisVote = old.user_vote_type === payload.voteType;
         const hadVote = old.user_has_voted;
@@ -187,12 +186,12 @@ const MasjidDetail = () => {
       // Use the server's authoritative count to patch the cache — no refetch needed
       const res = data as { newVerificationCount: number; newStatus: string } | undefined;
       if (res?.newVerificationCount !== undefined) {
-        queryClient.setQueryData(["verifyStatus", id], (old: VerificationStatus | undefined) =>
+        queryClient.setQueryData(["verifyStatus", slug], (old: VerificationStatus | undefined) =>
           old ? { ...old, verification_count: res.newVerificationCount, status: res.newStatus ?? old.status } : old
         );
       }
       // Still refresh the masjid card (status badge etc.)
-      queryClient.invalidateQueries({ queryKey: ["masjid", id] });
+      queryClient.invalidateQueries({ queryKey: ["masjid", slug] });
 
       if (variables.voteType === "downvote") {
         setReportType("wrong_info");
@@ -206,7 +205,7 @@ const MasjidDetail = () => {
     onError: (e, _, ctx) => {
       // Roll back the optimistic update
       if (ctx?.previous !== undefined) {
-        queryClient.setQueryData(["verifyStatus", id], ctx.previous);
+        queryClient.setQueryData(["verifyStatus", slug], ctx.previous);
       }
       toast({ title: "Gagal", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
     },
@@ -214,7 +213,7 @@ const MasjidDetail = () => {
 
   const reportMutation = useMutation({
     mutationFn: () =>
-      verificationsApi.report({ masjidId: id!, reportType, description: reportDesc }),
+      verificationsApi.report({ masjidId: masjid!.id, reportType, description: reportDesc }),
     onSuccess: () => {
       toast({ title: "Laporan dihantar", description: "Terima kasih. Kami akan semak." });
       setReportOpen(false);
@@ -226,7 +225,7 @@ const MasjidDetail = () => {
   });
 
   const mediaMutation = useMutation({
-    mutationFn: () => mediaApi.add(id!, { media_type: mediaType, url: mediaUrl }),
+    mutationFn: () => mediaApi.add(masjid!.id, { media_type: mediaType, url: mediaUrl }),
     onSuccess: () => {
       toast({ title: "Gambar ditambah! 📸" });
       setMediaOpen(false); setMediaUrl(""); setMediaType("main_photo");
@@ -238,7 +237,7 @@ const MasjidDetail = () => {
   });
 
   const mediaDeleteMutation = useMutation({
-    mutationFn: (mediaId: string) => mediaApi.remove(id!, mediaId),
+    mutationFn: (mediaId: string) => mediaApi.remove(masjid!.id, mediaId),
     onSuccess: () => { refetchMedia(); toast({ title: "Gambar dipadam" }); },
   });
 
@@ -269,13 +268,13 @@ const MasjidDetail = () => {
 
       const hasExisting = !!(facilitiesData);
       return hasExisting
-        ? facilitiesApi.update(id!, payload)
-        : facilitiesApi.create(id!, payload);
+        ? facilitiesApi.update(masjid!.id, payload)
+        : facilitiesApi.create(masjid!.id, payload);
     },
     onSuccess: () => {
       toast({ title: "Kemudahan disimpan! ✨", description: "+10 mata reputasi." });
       setFacOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["masjid", id] });
+      queryClient.invalidateQueries({ queryKey: ["masjid", slug] });
       refetchFacilities();
     },
     onError: (e) => {
@@ -294,7 +293,7 @@ const MasjidDetail = () => {
       async (pos) => {
         try {
           const result = await checkinsApi.checkIn({
-            masjidId: id!, visitType,
+            masjidId: masjid!.id, visitType,
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
           }) as { streak_count?: number; points_earned?: number };

@@ -14,12 +14,12 @@ const MasjidCard = ({ masjid }: { masjid: Masjid }) => {
   if (f?.terawih_rakaat) featureBadges.push({ label: `Terawih ${f.terawih_rakaat}`, icon: <Moon className="h-3 w-3" /> });
   if (f?.cooling_system?.includes("AC")) featureBadges.push({ label: "AC", icon: <Wind className="h-3 w-3" /> });
   if (f?.kucing_count && f.kucing_count !== "Takda" && f.kucing_count !== "Tidak Pasti") {
-    featureBadges.push({ label: "Ada Kucing í°±", icon: <Cat className="h-3 w-3" /> });
+    featureBadges.push({ label: "Ada Kucing ï¿½ï¿½ï¿½", icon: <Cat className="h-3 w-3" /> });
   }
 
   return (
     <Link
-      to={`/masjid/${masjid.id}`}
+      to={`/masjid/${masjid.slug ?? masjid.id}`}
       className="group block overflow-hidden rounded-2xl border bg-card transition-all hover:shadow-lg hover:-translate-y-1"
     >
       {/* Placeholder image area */}

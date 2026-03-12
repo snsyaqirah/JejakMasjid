@@ -36,6 +36,7 @@ export interface Facilities {
 
 export interface Masjid {
   id: string;
+  slug: string | null;
   name: string;
   address: string | null;
   description: string | null;

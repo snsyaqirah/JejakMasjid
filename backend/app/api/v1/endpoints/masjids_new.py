@@ -291,14 +291,21 @@ async def create_masjid(
             "status": "pending",
             "created_by": current_user['id']
         }
-        
+
+        # Pre-generate a temp slug (will be updated with real ID after insert)
         result = supabase.table('masjids').insert(masjid_data).execute()
-        
+
         if not result.data:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create masjid"
             )
+
+        row = result.data[0]
+        slug = _generate_slug(body.name, row["id"])
+        # Update with slug now that we have the real ID
+        supabase.table('masjids').update({"slug": slug}).eq("id", row["id"]).execute()
+        row["slug"] = slug
         
         # Award 50 reputation points for creating a masjid
         try:
@@ -314,7 +321,6 @@ async def create_masjid(
 
         # Build full MasjidDetail response — DB row lacks lat/lng (stored as PostGIS)
         # and related tables are empty on a brand-new masjid
-        row = result.data[0]
         return {
             **row,
             "latitude": body.latitude,
