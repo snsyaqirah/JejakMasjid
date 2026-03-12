@@ -10,6 +10,7 @@ import MasjidDetail from "./pages/MasjidDetail";
 import TrackingDashboard from "./pages/TrackingDashboard";
 import AddMasjid from "./pages/AddMasjid";
 import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/masjid/:id" element={<MasjidDetail />} />
             <Route path="/tracking" element={<TrackingDashboard />} />
             <Route path="/add" element={<AddMasjid />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

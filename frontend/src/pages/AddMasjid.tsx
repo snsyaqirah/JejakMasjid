@@ -10,7 +10,7 @@ import Footer from "@/components/Footer";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { masjidsApi, ApiError } from "@/lib/api";
+import { masjidsApi, facilitiesApi, ApiError } from "@/lib/api";
 import { MALAYSIA_STATES } from "@/lib/constants";
 
 const AddMasjid = () => {
@@ -93,6 +93,30 @@ const AddMasjid = () => {
         latitude: lat,
         longitude: lng,
       }) as { id: string };
+
+      // Save facilities data if any checkboxes were selected
+      const hasFacilityData = form.hasTerawih || form.hasIftar || form.hasOKUAccess ||
+        form.hasKidsArea || form.hasCoway;
+      if (hasFacilityData) {
+        try {
+          const facilitiesPayload: Record<string, unknown> = {
+            has_iftar: form.hasIftar,
+            has_parking_oku: form.hasOKUAccess,
+            has_kids_area: form.hasKidsArea,
+            has_coway: form.hasCoway,
+            is_family_friendly: true,
+          };
+          if (form.hasTerawih && form.terawihRakaat) {
+            facilitiesPayload.terawih_rakaat = parseInt(form.terawihRakaat);
+          }
+          if (form.hasIftar && form.iftarInfo) {
+            facilitiesPayload.iftar_menu = form.iftarInfo;
+          }
+          await facilitiesApi.create(result.id, facilitiesPayload);
+        } catch {
+          // Non-critical: masjid is already saved, facilities can be added later
+        }
+      }
 
       toast({
         title: "Masjid berjaya ditambah! 🕌",

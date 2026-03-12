@@ -1,23 +1,33 @@
 import { Link, useLocation } from "react-router-dom";
-import { Moon, Menu, X, LogIn, LogOut, User } from "lucide-react";
+import { Moon, Menu, X, LogIn, LogOut, User, PlusCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const links = [
+  // Main nav links — same for everyone
+  const publicLinks = [
     { to: "/", label: "Utama" },
     { to: "/browse", label: "Cari Masjid" },
-    ...(user ? [
-      { to: "/tracking", label: "Jejak Saya" },
-      { to: "/add", label: "Tambah Masjid" },
-    ] : []),
   ];
+
+  const authLinks = [
+    { to: "/tracking", label: "Jejak Saya" },
+  ];
+
+  const allLinks = user ? [...publicLinks, ...authLinks] : publicLinks;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -35,7 +45,7 @@ const Header = () => {
 
         {/* Desktop Nav */}
         <nav className="hidden items-center gap-1 md:flex">
-          {links.map((link) => (
+          {allLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
@@ -50,22 +60,42 @@ const Header = () => {
           ))}
 
           {user ? (
-            <div className="ml-3 flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                  {user.fullName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium text-foreground">{user.fullName}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={logout}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="ml-3 flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-secondary transition-colors focus:outline-none">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                      {user.fullName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium text-foreground max-w-[100px] truncate">
+                    {user.fullName}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
+                    <User className="h-4 w-4" />
+                    Profil Saya
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/add" className="flex items-center gap-2 cursor-pointer">
+                    <PlusCircle className="h-4 w-4" />
+                    Tambah Masjid
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Log Keluar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Button asChild variant="outline" size="sm" className="ml-3 rounded-lg">
               <Link to="/auth">
@@ -88,7 +118,7 @@ const Header = () => {
       {/* Mobile Nav */}
       {mobileOpen && (
         <nav className="border-t bg-card px-4 py-3 md:hidden animate-fade-in">
-          {links.map((link) => (
+          {allLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
@@ -104,25 +134,31 @@ const Header = () => {
           ))}
 
           {user ? (
-            <div className="mt-2 flex items-center justify-between rounded-lg px-4 py-3 border-t">
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                    {user.fullName.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-sm font-medium">{user.fullName}</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { logout(); setMobileOpen(false); }}
-                className="text-muted-foreground"
+            <>
+              <Link
+                to="/add"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
               >
-                <LogOut className="h-4 w-4 mr-1" />
-                Keluar
-              </Button>
-            </div>
+                <PlusCircle className="h-4 w-4" />
+                Tambah Masjid
+              </Link>
+              <Link
+                to="/profile"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                <User className="h-4 w-4" />
+                Profil Saya
+              </Link>
+              <button
+                onClick={() => { logout(); setMobileOpen(false); }}
+                className="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-destructive hover:bg-secondary transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Log Keluar
+              </button>
+            </>
           ) : (
             <Link
               to="/auth"

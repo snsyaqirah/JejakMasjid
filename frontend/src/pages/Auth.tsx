@@ -29,7 +29,7 @@ const Auth = () => {
     try {
       const data = await authApi.login({ email, password });
       authenticate(data.user as { id: string; email: string; user_metadata: Record<string, unknown> });
-      toast({ title: "Selamat datang! ���", description: "Anda berjaya log masuk." });
+      toast({ title: "Selamat datang! 🎉", description: "Anda berjaya log masuk." });
       navigate("/");
     } catch (err) {
       const msg = err instanceof ApiError && err.status === 403
@@ -84,7 +84,7 @@ const Auth = () => {
     try {
       const data = await authApi.verifyOtp({ email, token: otpCode });
       authenticate(data.user as { id: string; email: string; user_metadata: Record<string, unknown> });
-      toast({ title: "Akaun berjaya disahkan! ���", description: "Selamat datang ke JejakMasjid." });
+        toast({ title: "Akaun berjaya disahkan! 🎉", description: "Selamat datang ke JejakMasjid." });
       navigate("/");
     } catch (err) {
       toast({

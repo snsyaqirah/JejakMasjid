@@ -113,6 +113,39 @@ async def list_masjids(
         )
 
 
+@router.get("/stats", response_model=dict)
+async def get_masjid_stats(
+    supabase: Client = Depends(get_supabase_admin)
+):
+    """
+    Public stats for the homepage: total masjids, verified count, and total visits.
+    """
+    try:
+        masjids_res = supabase.table('masjids').select(
+            'id, status', count='exact'
+        ).is_('deleted_at', 'null').execute()
+
+        rows = masjids_res.data or []
+        total_masjids = masjids_res.count or len(rows)
+        verified_masjids = sum(1 for r in rows if r.get('status') == 'verified')
+
+        visits_res = supabase.table('user_visits').select(
+            'id', count='exact'
+        ).is_('deleted_at', 'null').execute()
+        total_visits = visits_res.count or 0
+
+        return {
+            "total_masjids": total_masjids,
+            "verified_masjids": verified_masjids,
+            "total_visits": total_visits,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
 @router.get("/{masjid_id}", response_model=MasjidDetail)
 async def get_masjid_detail(
     masjid_id: uuid.UUID,

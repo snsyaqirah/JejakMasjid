@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MasjidCard from "@/components/MasjidCard";
-import { masjidsApi } from "@/lib/api";
+import { masjidsApi, statsApi } from "@/lib/api";
 import type { Masjid } from "@/types";
 import heroImage from "@/assets/hero-mosque.jpg";
 
@@ -15,6 +15,12 @@ const Index = () => {
     queryFn: () => masjidsApi.list({ status: "verified", page_size: 3 }),
   });
   const featuredMasjids: Masjid[] = (data?.items ?? []) as Masjid[];
+
+  const { data: publicStats } = useQuery({
+    queryKey: ["stats", "public"],
+    queryFn: () => statsApi.public(),
+    staleTime: 5 * 60 * 1000, // 5 min cache
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,15 +79,21 @@ const Index = () => {
       <section className="border-b bg-card islamic-pattern">
         <div className="container mx-auto grid grid-cols-3 gap-4 px-4 py-8 text-center">
           <div>
-            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">6</p>
+            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">
+              {publicStats?.total_masjids ?? "—"}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground md:text-sm">Masjid Didaftarkan</p>
           </div>
           <div>
-            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">580+</p>
+            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">
+              {publicStats ? (publicStats.total_visits > 0 ? `${publicStats.total_visits}+` : publicStats.total_visits) : "—"}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground md:text-sm">Kunjungan Direkodkan</p>
           </div>
           <div>
-            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">4</p>
+            <p className="font-serif text-2xl font-bold text-primary md:text-3xl">
+              {publicStats?.verified_masjids ?? "—"}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground md:text-sm">Masjid Disahkan</p>
           </div>
         </div>

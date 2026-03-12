@@ -306,3 +306,45 @@ export const dashboardApi = {
     }>(`/api/v1/dashboard/leaderboard?limit=${limit}`),
 };
 
+// ── Public Stats ──────────────────────────────────────────────────
+
+export const statsApi = {
+  public: () =>
+    request<{
+      total_masjids: number;
+      verified_masjids: number;
+      total_visits: number;
+    }>("/api/v1/masjids/stats"),
+};
+
+// ── Profile ───────────────────────────────────────────────────────
+
+export const profileApi = {
+  get: () =>
+    request<{
+      id: string;
+      full_name: string;
+      phone_number: string | null;
+      reputation_points: number;
+      streak_count: number;
+      longest_streak: number;
+      last_checkin_at: string | null;
+      created_at: string | null;
+    }>("/api/v1/profile/me"),
+
+  update: (body: { full_name?: string; phone_number?: string }) =>
+    request<{
+      id: string;
+      full_name: string;
+      phone_number: string | null;
+      reputation_points: number;
+      streak_count: number;
+      longest_streak: number;
+      last_checkin_at: string | null;
+      created_at: string | null;
+    }>("/api/v1/profile/me", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+};
+
