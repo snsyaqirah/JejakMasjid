@@ -1,8 +1,10 @@
 """
 Masjid CRUD endpoints with 100m radius duplicate check and facilities management.
 """
+import re
 import uuid
 import struct
+import unicodedata
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -17,6 +19,18 @@ from app.schemas.facilities import FacilitiesCreate, FacilitiesUpdate, Facilitie
 from app.schemas.common import MessageResponse, PaginatedResponse
 
 router = APIRouter()
+
+
+def _slugify(text: str) -> str:
+    """Convert text to URL-safe ASCII slug."""
+    text = unicodedata.normalize('NFKD', text)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    text = re.sub(r'[^a-z0-9]+', '-', text.lower())
+    return text.strip('-')
+
+
+def _generate_slug(name: str, uid: str) -> str:
+    return f"{_slugify(name)}-{uid[:8]}"
 
 
 class _MediaAddBody(BaseModel):
@@ -153,26 +167,34 @@ async def get_masjid_stats(
         )
 
 
-@router.get("/{masjid_id}")
+@router.get("/{identifier}")
 async def get_masjid_detail(
-    masjid_id: uuid.UUID,
+    identifier: str,
     current_user: dict | None = Depends(get_current_user_optional),
     supabase: Client = Depends(get_supabase_admin)
 ):
     """
-    Get full masjid details including facilities, media, and live status.
+    Get full masjid details by UUID or slug.
     """
     try:
-        # Get masjid with all related data
-        result = supabase.table('masjids').select(
+        query = supabase.table('masjids').select(
             '''
             *,
             facilities:masjid_facilities(*),
             media:masjid_media(*),
             verification:verifications(count)
             '''
-        ).eq('id', str(masjid_id)).is_('deleted_at', 'null').execute()
-        
+        ).is_('deleted_at', 'null')
+
+        # Accept both UUID and slug
+        try:
+            uuid.UUID(identifier)
+            query = query.eq('id', identifier)
+        except ValueError:
+            query = query.eq('slug', identifier)
+
+        result = query.execute()
+
         if not result.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -198,7 +220,7 @@ async def get_masjid_detail(
 
         # Get live updates (active only) — set to None when empty
         live_updates = supabase.table('live_updates').select('*').eq(
-            'masjid_id', str(masjid_id)
+            'masjid_id', str(masjid['id'])
         ).gt('expires_at', 'now()').execute()
         live_status = live_updates.data[0] if live_updates.data else None
 
