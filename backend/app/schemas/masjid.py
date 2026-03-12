@@ -52,10 +52,10 @@ class MasjidMediaResponse(CamelModel):
     masjid_id: uuid.UUID
     media_type: MediaType
     url: str
-    is_verified: bool
-    verification_count: int
+    is_verified: bool = False
+    verification_count: int = 0
     created_at: datetime
-    created_by: uuid.UUID
+    created_by: uuid.UUID | None = None
 
 
 # ── Response bodies ─────────────────────────────────────────────────

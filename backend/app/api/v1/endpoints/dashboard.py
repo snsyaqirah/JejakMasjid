@@ -20,7 +20,7 @@ router = APIRouter()
 @router.get("/stats", response_model=UserStatsResponse)
 async def get_my_stats(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
     """
     Full dashboard stats for the authenticated user:
@@ -31,8 +31,8 @@ async def get_my_stats(
     # Profile data (streak + reputation)
     prof_res = supabase.table('profiles').select(
         'reputation_points, streak_count, longest_streak'
-    ).eq('id', user_id).single().execute()
-    prof = prof_res.data or {}
+    ).eq('id', user_id).execute()
+    prof = (prof_res.data[0] if prof_res.data else {}) or {}
 
     # All visits (for totals + breakdown)
     visits_res = supabase.table('user_visits').select(
@@ -88,7 +88,7 @@ async def get_my_stats(
 @router.get("/badges", response_model=list[UserBadgeResponse])
 async def get_my_badges(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
     """List all badges earned by the current user."""
     user_id = current_user['id']

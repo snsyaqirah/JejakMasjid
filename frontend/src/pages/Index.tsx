@@ -37,7 +37,7 @@ const Index = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-primary/90 via-primary/70 to-primary/40" />
         </div>
 
-        <div className="relative container mx-auto px-4 py-24 md:py-36">
+        <div className="relative container mx-auto px-4 py-14 md:py-24">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent/20 px-4 py-1.5 text-sm font-medium text-primary-foreground backdrop-blur-sm">
               <Compass className="h-4 w-4" />
@@ -77,7 +77,7 @@ const Index = () => {
 
       {/* Stats */}
       <section className="border-b bg-card islamic-pattern">
-        <div className="container mx-auto grid grid-cols-3 gap-4 px-4 py-8 text-center">
+        <div className="container mx-auto grid grid-cols-3 gap-4 px-4 py-5 text-center">
           <div>
             <p className="font-serif text-2xl font-bold text-primary md:text-3xl">
               {publicStats?.total_masjids ?? "—"}
@@ -100,8 +100,8 @@ const Index = () => {
       </section>
 
       {/* How it Works */}
-      <section className="container mx-auto px-4 py-16 md:py-24">
-        <div className="text-center mb-12">
+      <section className="container mx-auto px-4 py-10 md:py-16">
+          <div className="text-center mb-8">
           <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
             Macam mana ia berfungsi?
           </h2>
@@ -145,8 +145,8 @@ const Index = () => {
 
       {/* Featured Masjids */}
       <section className="bg-secondary/50 islamic-pattern">
-        <div className="container mx-auto px-4 py-16 md:py-24">
-          <div className="flex items-end justify-between mb-10">
+        <div className="container mx-auto px-4 py-10 md:py-16">
+          <div className="flex items-end justify-between mb-8">
             <div>
               <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
                 Masjid Popular
@@ -163,16 +163,34 @@ const Index = () => {
             </Button>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featuredMasjids.map((masjid) => (
-              <MasjidCard key={masjid.id} masjid={masjid} />
-            ))}
-          </div>
+          {featuredMasjids.length > 0 ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {featuredMasjids.map((masjid) => (
+                <MasjidCard key={masjid.id} masjid={masjid} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-card py-16 text-center">
+              <Moon className="mb-4 h-12 w-12 text-primary/30" />
+              <h3 className="font-serif text-lg font-semibold text-foreground">
+                Belum ada masjid popular lagi
+              </h3>
+              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                Jadilah yang pertama! Tambah masjid yang anda kunjungi dan bantu komuniti.
+              </p>
+              <Button asChild className="mt-6 rounded-xl font-semibold" size="sm">
+                <Link to="/add-masjid">
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Tambah Masjid
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="container mx-auto px-4 py-16 md:py-24 text-center">
+      <section className="container mx-auto px-4 py-10 md:py-16 text-center">
         <div className="mx-auto max-w-lg rounded-2xl border bg-card p-8 md:p-12">
           <Compass className="mx-auto h-10 w-10 text-accent mb-4" />
           <h2 className="font-serif text-2xl font-bold text-foreground md:text-3xl">

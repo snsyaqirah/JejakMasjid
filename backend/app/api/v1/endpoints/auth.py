@@ -30,15 +30,16 @@ async def sign_up(
     """
     try:
         # Sign up with Supabase Auth
+        meta = {"full_name": body.full_name}
+        if body.phone_number:
+            meta["phone_number"] = body.phone_number
+        if body.gender:
+            meta["gender"] = body.gender
+
         response = supabase.auth.sign_up({
             "email": body.email,
             "password": body.password,
-            "options": {
-                "data": {
-                    "full_name": body.full_name,
-                    "phone_number": body.phone_number
-                }
-            }
+            "options": {"data": meta}
         })
         
         if not response.user:
@@ -46,6 +47,17 @@ async def sign_up(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create user. Email may already exist."
             )
+
+        # Upsert profile so gender + full_name are always saved
+        try:
+            from app.core.supabase import get_supabase_admin as _get_admin
+            _admin = _get_admin()
+            profile_data: dict = {"id": str(response.user.id), "full_name": body.full_name}
+            if body.gender:
+                profile_data["gender"] = body.gender
+            _admin.table("profiles").upsert(profile_data).execute()
+        except Exception:
+            pass
         
         # When "Confirm email" is OFF, Supabase returns a session immediately
         if response.session:

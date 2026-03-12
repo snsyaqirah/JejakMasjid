@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Moon, ArrowLeft, LogIn, UserPlus, KeyRound } from "lucide-react";
+import { Moon, ArrowLeft, LogIn, UserPlus, KeyRound, Eye, EyeOff, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/contexts/AuthContext";
 import { authApi, ApiError, setTokens } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +13,60 @@ import Footer from "@/components/Footer";
 
 type Step = "login" | "signup" | "otp";
 
+const pwdRules = [
+  { key: "len",     label: "Sekurang-kurangnya 8 aksara",  test: (p: string) => p.length >= 8 },
+  { key: "upper",  label: "Huruf besar (A-Z)",             test: (p: string) => /[A-Z]/.test(p) },
+  { key: "lower",  label: "Huruf kecil (a-z)",             test: (p: string) => /[a-z]/.test(p) },
+  { key: "num",    label: "Nombor (0-9)",                  test: (p: string) => /[0-9]/.test(p) },
+  { key: "sym",    label: "Simbol (!@#$...)",              test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+];
+
+function PasswordStrength({ password }: { password: string }) {
+  if (!password) return null;
+  const passed = pwdRules.filter((r) => r.test(password)).length;
+  const colors = ["bg-red-500", "bg-orange-400", "bg-yellow-400", "bg-lime-400", "bg-green-500"];
+  const labels = ["Sangat lemah", "Lemah", "Sederhana", "Kuat", "Sangat kuat"];
+  return (
+    <div className="mt-2 space-y-2">
+      {/* Strength bar */}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-1">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div
+              key={i}
+              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                i <= passed ? colors[passed - 1] : "bg-muted"
+              }`}
+            />
+          ))}
+        </div>
+        <span className={`text-xs font-medium ${
+          passed <= 1 ? "text-red-500" :
+          passed === 2 ? "text-orange-400" :
+          passed === 3 ? "text-yellow-500" :
+          passed === 4 ? "text-lime-500" : "text-green-500"
+        }`}>{labels[passed - 1] ?? ""}</span>
+      </div>
+      {/* Checklist */}
+      <ul className="space-y-1">
+        {pwdRules.map((r) => {
+          const ok = r.test(password);
+          return (
+            <li key={r.key} className={`flex items-center gap-1.5 text-xs transition-colors ${
+              ok ? "text-green-600" : "text-muted-foreground"
+            }`}>
+              {ok
+                ? <Check className="h-3 w-3 shrink-0 text-green-600" />
+                : <X className="h-3 w-3 shrink-0 text-muted-foreground/50" />}
+              {r.label}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 const Auth = () => {
   const [step, setStep] = useState<Step>("login");
   const [email, setEmail] = useState("");
@@ -19,6 +74,9 @@ const Auth = () => {
   const [fullName, setFullName] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [gender, setGender] = useState<"Lelaki" | "Perempuan" | "">("")
+  const [showPassword, setShowPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);;
   const { authenticate } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -47,9 +105,18 @@ const Auth = () => {
       toast({ title: "Nama diperlukan", description: "Sila masukkan nama penuh anda.", variant: "destructive" });
       return;
     }
+    if (!gender) {
+      toast({ title: "Jantina diperlukan", description: "Sila pilih jantina anda.", variant: "destructive" });
+      return;
+    }
+    const allPassed = pwdRules.every((r) => r.test(password));
+    if (!allPassed) {
+      toast({ title: "Kata laluan tidak memenuhi syarat", description: "Sila semak semua keperluan kata laluan.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
-      const data = await authApi.signup({ email, password, fullName });
+      const data = await authApi.signup({ email, password, fullName, gender: gender as "Lelaki" | "Perempuan" });
       if (data.accessToken && data.refreshToken && data.user) {
         // Email confirm is OFF — user is auto-confirmed, log in immediately
         setTokens(data.accessToken, data.refreshToken);
@@ -189,7 +256,26 @@ const Auth = () => {
                   </div>
                   <div>
                     <Label htmlFor="password">Kata Laluan</Label>
-                    <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="mt-1.5" required />
+                    <div className="relative mt-1.5">
+                      <Input
+                        id="password"
+                        type={showLoginPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                        aria-label={showLoginPassword ? "Sembunyikan kata laluan" : "Tunjuk kata laluan"}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Memuatkan..." : "Log Masuk"}
@@ -219,12 +305,46 @@ const Auth = () => {
                     <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ahmad bin Abdullah" className="mt-1.5" required />
                   </div>
                   <div>
+                    <Label>Jantina *</Label>
+                    <RadioGroup value={gender} onValueChange={(v) => setGender(v as "Lelaki" | "Perempuan")} className="mt-2 flex gap-4">
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="Lelaki" id="gender-l" />
+                        <Label htmlFor="gender-l" className="font-normal cursor-pointer">Lelaki</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="Perempuan" id="gender-p" />
+                        <Label htmlFor="gender-p" className="font-normal cursor-pointer">Perempuan</Label>
+                      </div>
+                    </RadioGroup>
+                    <p className="text-xs text-muted-foreground mt-1">Digunakan untuk tunjuk info kemudahan yang relevan</p>
+                  </div>
+                  <div>
                     <Label htmlFor="emailSignup">Email</Label>
                     <Input id="emailSignup" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@email.com" className="mt-1.5" required />
                   </div>
                   <div>
                     <Label htmlFor="passwordSignup">Kata Laluan</Label>
-                    <Input id="passwordSignup" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 8 aksara" minLength={8} className="mt-1.5" required />
+                    <div className="relative mt-1.5">
+                      <Input
+                        id="passwordSignup"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Min. 8 aksara"
+                        className="pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                        aria-label={showPassword ? "Sembunyikan kata laluan" : "Tunjuk kata laluan"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <PasswordStrength password={password} />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Mendaftar..." : "Daftar & Hantar Kod"}

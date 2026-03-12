@@ -69,45 +69,48 @@ const BrowseMasjid = () => {
           </div>
         </div>
 
-        {/* Quick Tags Filter */}
-        <div className="mb-4">
-          <p className="text-sm font-medium text-muted-foreground mb-2">Filter kemudahan:</p>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_TAGS.map((tag) => (
-              <button
-                key={tag.key}
-                onClick={() => toggleTag(tag.key)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  selectedTags.includes(tag.key)
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                }`}
-              >
-                {tag.label}
-              </button>
-            ))}
+        {/* Filter + Sort bar */}
+        <div className="mb-6 space-y-2">
+          {/* Filter tags — horizontally scrollable on mobile, wraps on desktop */}
+          <div className="flex items-start gap-2">
+            <span className="shrink-0 pt-1.5 text-xs font-medium text-muted-foreground">Filter:</span>
+            <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap md:flex-wrap scrollbar-none -mr-4 pr-4">
+              {QUICK_TAGS.map((tag) => (
+                <button
+                  key={tag.key}
+                  onClick={() => toggleTag(tag.key)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    selectedTags.includes(tag.key)
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                  }`}
+                >
+                  {tag.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Sort */}
-        <div className="mb-6 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Susun:</span>
-          <button
-            onClick={() => setSortBy("verification")}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              sortBy === "verification" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            Paling Disahkan
-          </button>
-          <button
-            onClick={() => setSortBy("name")}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1 ${
-              sortBy === "name" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            <Star className="h-3 w-3" /> Nama A-Z
-          </button>
+          {/* Sort */}
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 text-xs font-medium text-muted-foreground">Susun:</span>
+            <button
+              onClick={() => setSortBy("verification")}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                sortBy === "verification" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
+              }`}
+            >
+              Paling Disahkan
+            </button>
+            <button
+              onClick={() => setSortBy("name")}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1 ${
+                sortBy === "name" ? "bg-accent text-accent-foreground" : "bg-secondary text-muted-foreground"
+              }`}
+            >
+              <Star className="h-3 w-3" /> Nama A-Z
+            </button>
+          </div>
         </div>
 
         {/* Results */}

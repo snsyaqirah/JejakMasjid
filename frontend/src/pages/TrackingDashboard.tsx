@@ -1,6 +1,7 @@
-import { Moon, Calendar, MapPin, TrendingUp, Trophy, Map, Loader2 } from "lucide-react";
+import { Moon, Calendar, MapPin, TrendingUp, Trophy, Map, Loader2, PlusCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { dashboardApi, checkinsApi } from "@/lib/api";
@@ -46,11 +47,28 @@ const TrackingDashboard = () => {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">Jejak Saya</h1>
-          <p className="mt-2 text-muted-foreground">
-            Semua masjid yang anda dah kunjungi — passport masjid peribadi anda
-          </p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-3xl font-bold text-foreground md:text-4xl">Jejak Saya</h1>
+            <p className="mt-2 text-muted-foreground">
+              Semua masjid yang anda dah kunjungi — passport masjid peribadi anda
+            </p>
+          </div>
+          <Button asChild className="rounded-xl gap-2 hidden sm:flex">
+            <Link to="/add">
+              <PlusCircle className="h-4 w-4" />
+              Tambah Masjid
+            </Link>
+          </Button>
+        </div>
+        {/* Mobile Tambah button */}
+        <div className="mb-6 sm:hidden">
+          <Button asChild className="w-full rounded-xl gap-2">
+            <Link to="/add">
+              <PlusCircle className="h-4 w-4" />
+              Tambah Masjid
+            </Link>
+          </Button>
         </div>
 
         {isLoading ? (

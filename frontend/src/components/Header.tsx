@@ -1,8 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { Moon, Menu, X, LogIn, LogOut, User, PlusCircle } from "lucide-react";
+import { Moon, Menu, X, LogIn, LogOut, User, PlusCircle, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { profileApi } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -16,6 +18,14 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: () => profileApi.get(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+  const isAdmin = profile?.is_admin ?? false;
 
   // Main nav links — same for everyone
   const publicLinks = [
@@ -86,6 +96,17 @@ const Header = () => {
                     Tambah Masjid
                   </Link>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="flex items-center gap-2 cursor-pointer text-primary">
+                        <ShieldCheck className="h-4 w-4" />
+                        Panel Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={logout}

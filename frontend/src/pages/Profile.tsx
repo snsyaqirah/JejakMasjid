@@ -1,21 +1,25 @@
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
-import { User, Edit2, Save, X, Trophy, Calendar, MapPin, TrendingUp, Loader2 } from "lucide-react";
+import { Navigate, Link } from "react-router-dom";
+import { User, Edit2, Save, X, Trophy, Calendar, MapPin, TrendingUp, Loader2, Flag, CheckCircle2, XCircle, Clock, Search } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { profileApi, ApiError } from "@/lib/api";
+import { profileApi, verificationsApi, ApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import type { Report, ReportStatus } from "@/types";
 
 type ProfileData = {
   id: string;
   full_name: string;
   phone_number: string | null;
+  gender: string | null;
   reputation_points: number;
   streak_count: number;
   longest_streak: number;
@@ -23,12 +27,28 @@ type ProfileData = {
   created_at: string | null;
 };
 
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  does_not_exist: "Tidak wujud",
+  wrong_location: "Lokasi salah",
+  duplicate: "Duplikat",
+  wrong_info: "Info tidak tepat",
+  inappropriate_content: "Kandungan tidak sesuai",
+  other: "Lain-lain",
+};
+
+const STATUS_CONFIG: Record<ReportStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
+  pending:   { label: "Menunggu",       variant: "secondary",   icon: <Clock className="h-3 w-3" /> },
+  reviewing: { label: "Sedang Disemak", variant: "default",     icon: <Search className="h-3 w-3" /> },
+  resolved:  { label: "Selesai",        variant: "outline",     icon: <CheckCircle2 className="h-3 w-3" /> },
+  dismissed: { label: "Ditolak",        variant: "destructive", icon: <XCircle className="h-3 w-3" /> },
+};
+
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ full_name: "", phone_number: "" });
+  const [form, setForm] = useState({ full_name: "", phone_number: "", gender: "" });
 
   if (!user) return <Navigate to="/auth" replace />;
 
@@ -37,12 +57,18 @@ const Profile = () => {
     queryFn: () => profileApi.get(),
   });
 
+  const { data: myReports, isLoading: loadingReports } = useQuery<Report[]>({
+    queryKey: ["reports", "mine"],
+    queryFn: () => verificationsApi.getMyReports(),
+  });
+
   // Sync form when profile loads
   useEffect(() => {
     if (profile) {
       setForm({
         full_name: profile.full_name ?? "",
         phone_number: profile.phone_number ?? "",
+        gender: profile.gender ?? "",
       });
     }
   }, [profile]);
@@ -52,6 +78,7 @@ const Profile = () => {
       profileApi.update({
         full_name: form.full_name || undefined,
         phone_number: form.phone_number || undefined,
+        gender: (form.gender as "Lelaki" | "Perempuan" | undefined) || undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", "me"] });
@@ -71,13 +98,16 @@ const Profile = () => {
     setForm({
       full_name: profile?.full_name ?? "",
       phone_number: profile?.phone_number ?? "",
+      gender: profile?.gender ?? "",
     });
     setEditing(true);
   };
 
   const formatDate = (iso: string | null | undefined) => {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("ms-MY", {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("ms-MY", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -151,7 +181,23 @@ const Profile = () => {
                       className="rounded-xl bg-background"
                     />
                   </div>
-                  <div className="flex gap-3">
+                  <div className="space-y-2">
+                    <Label>Jantina</Label>
+                    <RadioGroup
+                      value={form.gender}
+                      onValueChange={(v) => setForm((f) => ({ ...f, gender: v }))}
+                      className="flex gap-6 pt-1"
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <RadioGroupItem value="Lelaki" id="gender-l" />
+                        <Label htmlFor="gender-l" className="cursor-pointer font-normal">Lelaki</Label>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <RadioGroupItem value="Perempuan" id="gender-p" />
+                        <Label htmlFor="gender-p" className="cursor-pointer font-normal">Perempuan</Label>
+                      </label>
+                    </RadioGroup>
+                  </div>                  <div className="flex gap-3">
                     <Button
                       onClick={() => mutation.mutate()}
                       disabled={mutation.isPending}
@@ -221,6 +267,62 @@ const Profile = () => {
                 <p className="text-sm font-medium text-foreground">{profile.phone_number}</p>
               </div>
             )}
+
+            {/* My Reports */}
+            <div className="rounded-2xl border bg-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Flag className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold text-sm">Laporan Saya</h3>
+                {(myReports?.length ?? 0) > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">{myReports!.length} laporan</span>
+                )}
+              </div>
+
+              {loadingReports ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              ) : !myReports?.length ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Tiada laporan lagi</p>
+              ) : (
+                <div className="space-y-3">
+                  {myReports.map((r) => {
+                    const cfg = STATUS_CONFIG[r.status];
+                    return (
+                      <div key={r.id} className="rounded-xl border bg-background p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <Link
+                              to={`/masjid/${r.masjid_id}`}
+                              className="text-sm font-medium hover:underline truncate block"
+                            >
+                              {r.masjids?.name ?? r.masjid_id}
+                            </Link>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {REPORT_TYPE_LABELS[r.report_type] ?? r.report_type}
+                              {" · "}
+                              {(() => { const d = new Date(r.created_at); return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("ms-MY", { day: "numeric", month: "short", year: "numeric" }); })()}
+                            </p>
+                            {r.description && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{r.description}</p>
+                            )}
+                          </div>
+                          <Badge variant={cfg.variant} className="flex items-center gap-1 shrink-0 text-xs">
+                            {cfg.icon} {cfg.label}
+                          </Badge>
+                        </div>
+                        {r.resolution_notes && (
+                          <div className="mt-2 rounded-lg bg-muted/60 px-2.5 py-1.5 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">Nota admin: </span>
+                            {r.resolution_notes}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

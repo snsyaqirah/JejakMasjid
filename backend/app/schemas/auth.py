@@ -12,6 +12,7 @@ class SignUpRequest(CamelModel):
     password: str = Field(min_length=8, description="Min 8 characters")
     full_name: str = Field(min_length=2, max_length=100)
     phone_number: str | None = None
+    gender: str | None = None  # 'Lelaki' or 'Perempuan'
 
 
 class SignUpResponse(CamelModel):

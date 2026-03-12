@@ -106,7 +106,7 @@ async def get_update_options():
 @router.get("/{masjid_id}", response_model=MasjidLiveStatus)
 async def get_masjid_live_status(
     masjid_id: uuid.UUID,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
     """
     Get all currently active live updates for a masjid.

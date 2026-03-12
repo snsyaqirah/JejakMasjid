@@ -14,10 +14,10 @@ from app.schemas.facilities import FacilitiesCreate, FacilitiesUpdate, Facilitie
 router = APIRouter()
 
 
-@router.get("/{masjid_id}", response_model=FacilitiesResponse | None)
+@router.get("/{masjid_id}")
 async def get_facilities(
     masjid_id: uuid.UUID,
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
     """Get facilities info for a masjid. Returns null if not yet added."""
     result = supabase.table('masjid_facilities').select('*').eq(
@@ -29,7 +29,7 @@ async def get_facilities(
     return result.data[0]
 
 
-@router.post("/{masjid_id}", response_model=FacilitiesResponse, status_code=201)
+@router.post("/{masjid_id}", status_code=201)
 async def create_facilities(
     masjid_id: uuid.UUID,
     body: FacilitiesCreate,
@@ -83,7 +83,7 @@ async def create_facilities(
     return result.data[0]
 
 
-@router.patch("/{masjid_id}", response_model=FacilitiesResponse)
+@router.patch("/{masjid_id}")
 async def update_facilities(
     masjid_id: uuid.UUID,
     body: FacilitiesUpdate,

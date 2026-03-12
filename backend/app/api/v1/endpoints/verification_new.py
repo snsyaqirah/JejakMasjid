@@ -6,6 +6,7 @@ Verification & reporting endpoints.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from supabase import Client
 
 from app.core.supabase import get_supabase, get_supabase_admin
@@ -39,12 +40,12 @@ async def vote_on_masjid(
     # Fetch masjid (must exist, not deleted)
     masjid_res = supabase.table('masjids').select(
         'id, status, created_by, verification_count'
-    ).eq('id', masjid_id_str).is_('deleted_at', 'null').single().execute()
+    ).eq('id', masjid_id_str).is_('deleted_at', 'null').execute()
 
     if not masjid_res.data:
         raise HTTPException(status_code=404, detail="Masjid tidak dijumpai")
 
-    masjid = masjid_res.data
+    masjid = masjid_res.data[0]
 
     # Cannot vote on own submission
     if masjid.get('created_by') == user_id:
@@ -68,15 +69,17 @@ async def vote_on_masjid(
     if existing_res.data:
         existing = existing_res.data[0]
         if existing['vote_type'] == body.vote_type:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Anda sudah mengundi cara yang sama untuk masjid ini"
-            )
-        # Update existing vote
-        supabase.table('verifications').update({
-            'vote_type': body.vote_type,
-            'reason': body.reason,
-        }).eq('id', existing['id']).execute()
+            # Same vote type — toggle off (remove the vote)
+            supabase.table('verifications').update({
+                'deleted_at': 'now()'
+            }).eq('id', existing['id']).execute()
+        else:
+            # Different vote type — switch the vote
+            supabase.table('verifications').update({
+                'vote_type': body.vote_type,
+                'reason': body.reason,
+                'deleted_at': None,
+            }).eq('id', existing['id']).execute()
     else:
         # Create new vote
         supabase.table('verifications').insert({
@@ -98,15 +101,28 @@ async def vote_on_masjid(
     except Exception:
         pass
 
-    # Re-fetch masjid to get updated status (DB trigger may have verified it)
-    updated_res = supabase.table('masjids').select(
-        'status, verification_count'
-    ).eq('id', masjid_id_str).single().execute()
-    updated = updated_res.data or {}
+    # Recount upvotes directly — don't rely on DB trigger (trigger may not fire on UPDATE)
+    upvote_res = supabase.table('verifications').select(
+        'id', count='exact'
+    ).eq('masjid_id', masjid_id_str).eq('vote_type', 'upvote').is_('deleted_at', 'null').execute()
+    new_count = upvote_res.count or 0
 
-    new_status = updated.get('status', masjid['status'])
-    new_count = updated.get('verification_count', masjid.get('verification_count', 0))
-    was_auto_verified = (new_status == 'verified' and masjid['status'] == 'pending')
+    # Determine new status: auto-verify at 3 upvotes, unflag if upvotes recover
+    old_status = masjid['status']
+    if new_count >= 3 and old_status == 'pending':
+        new_status = 'verified'
+    elif new_count == 0 and old_status == 'verified':
+        new_status = 'pending'
+    else:
+        new_status = old_status
+
+    # Write the authoritative count (and status) back to the masjid row
+    supabase.table('masjids').update({
+        'verification_count': new_count,
+        'status': new_status,
+    }).eq('id', masjid_id_str).execute()
+
+    was_auto_verified = (new_status == 'verified' and old_status == 'pending')
 
     # Award creator +25 bonus when their masjid gets auto-verified
     if was_auto_verified and masjid.get('created_by'):
@@ -134,19 +150,19 @@ async def vote_on_masjid(
 async def get_verification_status(
     masjid_id: uuid.UUID,
     current_user: dict | None = Depends(get_current_user_optional),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
     """Get current verification status of a masjid, including user's own vote if authenticated."""
     masjid_id_str = str(masjid_id)
 
     masjid_res = supabase.table('masjids').select(
         'status, verification_count'
-    ).eq('id', masjid_id_str).is_('deleted_at', 'null').single().execute()
+    ).eq('id', masjid_id_str).is_('deleted_at', 'null').execute()
 
     if not masjid_res.data:
         raise HTTPException(status_code=404, detail="Masjid not found")
 
-    masjid = masjid_res.data
+    masjid = masjid_res.data[0]
     needed = max(0, 3 - (masjid.get('verification_count') or 0))
 
     user_has_voted = False
@@ -214,7 +230,7 @@ async def report_masjid(
 @router.get("/reports/mine", response_model=list[ReportResponse])
 async def get_my_reports(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase_admin),
 ):
     """Get all reports submitted by the current user."""
     result = supabase.table('reports').select('*').eq(
@@ -233,3 +249,55 @@ async def get_my_reports(
         )
         for r in (result.data or [])
     ]
+
+
+# ── Admin: Manage Reports ─────────────────────────────────────────
+
+def _require_admin(user_id: str, supabase: Client):
+    """Raise 403 if user is not an admin."""
+    result = supabase.table('profiles').select('is_admin').eq('id', user_id).single().execute()
+    if not result.data or not result.data.get('is_admin'):
+        raise HTTPException(status_code=403, detail="Admin sahaja")
+
+
+@router.get("/reports/all")
+async def admin_list_reports(
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_admin),
+):
+    """[Admin] List all reports, newest first, with masjid name."""
+    _require_admin(current_user['id'], supabase)
+    result = supabase.table('reports').select(
+        'id, masjid_id, reporter_id, report_type, description, status, resolution_notes, resolved_at, created_at, masjids(id, name)'
+    ).order('created_at', desc=True).execute()
+    return result.data or []
+
+
+class ReportResolve(BaseModel):
+    status: str  # 'reviewing' | 'resolved' | 'dismissed'
+    resolution_notes: str | None = None
+
+
+@router.patch("/reports/{report_id}")
+async def admin_update_report(
+    report_id: str,
+    body: ReportResolve,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_admin),
+):
+    """[Admin] Update a report status and add resolution notes."""
+    _require_admin(current_user['id'], supabase)
+
+    from datetime import datetime, timezone
+    update_data: dict = {
+        'status': body.status,
+        'resolution_notes': body.resolution_notes,
+        'resolved_by': current_user['id'],
+        'resolved_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+    result = supabase.table('reports').update(update_data).eq('id', report_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Report tidak dijumpai")
+    return result.data[0]
+

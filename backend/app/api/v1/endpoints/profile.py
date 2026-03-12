@@ -15,11 +15,13 @@ class ProfileResponse(BaseModel):
     id: str
     full_name: str
     phone_number: str | None = None
+    gender: str | None = None
     reputation_points: int = 0
     streak_count: int = 0
     longest_streak: int = 0
     last_checkin_at: str | None = None
     created_at: str | None = None
+    is_admin: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -27,6 +29,7 @@ class ProfileResponse(BaseModel):
 class ProfileUpdate(BaseModel):
     full_name: str | None = None
     phone_number: str | None = None
+    gender: str | None = None  # 'Lelaki' or 'Perempuan'
 
 
 @router.get("/me", response_model=ProfileResponse)

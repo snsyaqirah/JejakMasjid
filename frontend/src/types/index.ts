@@ -136,6 +136,23 @@ export interface CheckInResult {
   distance_meters: number;
 }
 
+// ── Reports ──────────────────────────────────────────────────────
+
+export type ReportStatus = "pending" | "reviewing" | "resolved" | "dismissed";
+
+export interface Report {
+  id: string;
+  masjid_id: string;
+  reporter_id: string | null;
+  report_type: string;
+  description: string | null;
+  status: ReportStatus;
+  resolution_notes: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  masjids: { id: string; name: string } | null;
+}
+
 // ── Verification ──────────────────────────────────────────────────
 
 export interface VerificationStatus {

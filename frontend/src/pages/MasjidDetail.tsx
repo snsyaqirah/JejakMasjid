@@ -2,17 +2,35 @@ import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   MapPin, CheckCircle, ArrowLeft, Users, Wind, Cat,
-  Utensils, ThumbsUp, ThumbsDown, Loader2, Moon
+  Utensils, ThumbsUp, ThumbsDown, Loader2, Moon, Camera,
+  Flag, X, Plus, Trash2, Car, Droplets, BookOpen,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from "@/components/ui/sheet";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { masjidsApi, verificationsApi, checkinsApi, liveUpdatesApi, ApiError } from "@/lib/api";
+import {
+  masjidsApi, verificationsApi, checkinsApi, liveUpdatesApi,
+  facilitiesApi, mediaApi, ApiError,
+} from "@/lib/api";
+import type { MediaType } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import type { Masjid, Facilities, LiveStatus } from "@/types";
+import type { Masjid, Facilities, LiveStatus, VerificationStatus } from "@/types";
 
 const VISIT_TYPES = [
   { key: "general", label: "Solat" },
@@ -22,6 +40,47 @@ const VISIT_TYPES = [
   { key: "kuliah", label: "Kuliah" },
 ] as const;
 
+const MEDIA_LABELS: Record<MediaType, string> = {
+  main_photo: "Gambar Utama",
+  interior_photo: "Dalaman",
+  toilet_photo: "Tandas",
+  qr_tng: "QR TNG",
+  qr_duitnow: "QR DuitNow",
+  masjid_board: "Papan Info",
+};
+
+const REPORT_TYPES = [
+  { value: "does_not_exist", label: "Masjid ini tidak wujud" },
+  { value: "wrong_location", label: "Lokasi salah" },
+  { value: "duplicate", label: "Duplikat (sudah ada)" },
+  { value: "wrong_info", label: "Maklumat tidak tepat" },
+  { value: "inappropriate_content", label: "Kandungan tidak sesuai" },
+  { value: "other", label: "Lain-lain" },
+];
+
+const defaultFacForm = {
+  terawih_rakaat: "" as "" | "8" | "11" | "20" | "23",
+  has_iftar: false,
+  iftar_type: "" as string,
+  cooling_system: "Kipas Biasa" as string,
+  has_coway: false,
+  kucing_count: "Tidak Pasti" as string,
+  karpet_vibe: "" as string,
+  parking_level: "" as string,
+  has_parking_oku: false,
+  has_parking_moto: true,
+  has_kids_area: false,
+  is_family_friendly: true,
+  has_clean_telekung: false,
+  telekung_rating: "" as string,
+  wudhu_seating: false,
+  toilet_cleanliness: "" as string,
+  toilet_floor_condition: "" as string,
+  is_tourist_friendly: false,
+  has_tahfiz: false,
+  has_library: false,
+};
+
 const MasjidDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -30,6 +89,20 @@ const MasjidDetail = () => {
   const queryClient = useQueryClient();
 
   const [checkingIn, setCheckingIn] = useState(false);
+  // Report dialog
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportType, setReportType] = useState("");
+  const [reportDesc, setReportDesc] = useState("");
+  // Downvote reason dialog
+  const [downvoteOpen, setDownvoteOpen] = useState(false);
+  const [downvoteReason, setDownvoteReason] = useState("");
+  // Media dialog
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaType, setMediaType] = useState<MediaType>("main_photo");
+  // Facilities sheet
+  const [facOpen, setFacOpen] = useState(false);
+  const [facForm, setFacForm] = useState(defaultFacForm);
 
   // ── queries ───────────────────────────────────────────────────
   const { data: masjid, isLoading, isError } = useQuery({
@@ -46,104 +119,263 @@ const MasjidDetail = () => {
 
   const { data: verifyStatus, refetch: refetchVerify } = useQuery({
     queryKey: ["verifyStatus", id],
-    queryFn: () => verificationsApi.status(id!),
-    enabled: !!id && !!user,
+    queryFn: () => verificationsApi.getStatus(id!),
+    enabled: !!id,
+  });
+
+  const { data: facilitiesData, refetch: refetchFacilities } = useQuery({
+    queryKey: ["facilities", id],
+    queryFn: () => facilitiesApi.get(id!),
+    enabled: !!id,
+  });
+
+  const { data: mediaItems, refetch: refetchMedia } = useQuery({
+    queryKey: ["media", id],
+    queryFn: () => mediaApi.get(id!),
+    enabled: !!id,
   });
 
   // ── mutations ─────────────────────────────────────────────────
   const voteMutation = useMutation({
-    mutationFn: (voteType: "upvote" | "downvote") =>
-      verificationsApi.vote({ masjidId: id!, voteType }),
-    onSuccess: () => {
-      toast({ title: "Terima kasih!", description: "Pengesahan anda direkodkan." });
+    mutationFn: (payload: { voteType: "upvote" | "downvote"; reason?: string }) =>
+      verificationsApi.vote({ masjidId: id!, voteType: payload.voteType, reason: payload.reason }),
+
+    onMutate: async (payload) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["verifyStatus", id] });
+      const previous = queryClient.getQueryData(["verifyStatus", id]);
+
+      queryClient.setQueryData(["verifyStatus", id], (old: VerificationStatus | undefined) => {
+        if (!old) return old;
+        const wasThisVote = old.user_vote_type === payload.voteType;
+        const hadVote = old.user_has_voted;
+        const wasUpvote = old.user_vote_type === "upvote";
+        const isUpvote = payload.voteType === "upvote";
+
+        // Toggle off (same vote tapped again)
+        if (wasThisVote) {
+          return {
+            ...old,
+            user_has_voted: false,
+            user_vote_type: null,
+            verification_count: isUpvote ? Math.max(0, old.verification_count - 1) : old.verification_count,
+          };
+        }
+        // Switching vote type
+        if (hadVote) {
+          return {
+            ...old,
+            user_vote_type: payload.voteType,
+            verification_count: wasUpvote
+              ? Math.max(0, old.verification_count - 1)  // was upvote → now downvote
+              : old.verification_count + 1,              // was downvote → now upvote
+          };
+        }
+        // New vote
+        return {
+          ...old,
+          user_has_voted: true,
+          user_vote_type: payload.voteType,
+          verification_count: isUpvote ? old.verification_count + 1 : old.verification_count,
+        };
+      });
+
+      return { previous };
+    },
+
+    onSuccess: (data, variables) => {
+      // Use the server's authoritative count to patch the cache — no refetch needed
+      const res = data as { newVerificationCount: number; newStatus: string } | undefined;
+      if (res?.newVerificationCount !== undefined) {
+        queryClient.setQueryData(["verifyStatus", id], (old: VerificationStatus | undefined) =>
+          old ? { ...old, verification_count: res.newVerificationCount, status: res.newStatus ?? old.status } : old
+        );
+      }
+      // Still refresh the masjid card (status badge etc.)
       queryClient.invalidateQueries({ queryKey: ["masjid", id] });
-      refetchVerify();
+
+      if (variables.voteType === "downvote") {
+        setReportType("wrong_info");
+        setReportDesc(variables.reason ?? "");
+        setReportOpen(true);
+      } else {
+        toast({ title: "Terima kasih!", description: "Pengesahan anda direkodkan." });
+      }
+    },
+
+    onError: (e, _, ctx) => {
+      // Roll back the optimistic update
+      if (ctx?.previous !== undefined) {
+        queryClient.setQueryData(["verifyStatus", id], ctx.previous);
+      }
+      toast({ title: "Gagal", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
+    },
+  });
+
+  const reportMutation = useMutation({
+    mutationFn: () =>
+      verificationsApi.report({ masjidId: id!, reportType, description: reportDesc }),
+    onSuccess: () => {
+      toast({ title: "Laporan dihantar", description: "Terima kasih. Kami akan semak." });
+      setReportOpen(false);
+      setReportType(""); setReportDesc("");
     },
     onError: (e) => {
-      toast({ title: "Gagal", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
+      toast({ title: "Gagal hantar laporan", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
+    },
+  });
+
+  const mediaMutation = useMutation({
+    mutationFn: () => mediaApi.add(id!, { media_type: mediaType, url: mediaUrl }),
+    onSuccess: () => {
+      toast({ title: "Gambar ditambah! 📸" });
+      setMediaOpen(false); setMediaUrl(""); setMediaType("main_photo");
+      refetchMedia();
+    },
+    onError: (e) => {
+      toast({ title: "Gagal tambah gambar", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
+    },
+  });
+
+  const mediaDeleteMutation = useMutation({
+    mutationFn: (mediaId: string) => mediaApi.remove(id!, mediaId),
+    onSuccess: () => { refetchMedia(); toast({ title: "Gambar dipadam" }); },
+  });
+
+  const facMutation = useMutation({
+    mutationFn: () => {
+      const payload: Record<string, unknown> = {
+        has_iftar: facForm.has_iftar,
+        has_coway: facForm.has_coway,
+        has_kids_area: facForm.has_kids_area,
+        is_family_friendly: facForm.is_family_friendly,
+        has_parking_oku: facForm.has_parking_oku,
+        has_parking_moto: facForm.has_parking_moto,
+        has_clean_telekung: facForm.has_clean_telekung,
+        wudhu_seating: facForm.wudhu_seating,
+        is_tourist_friendly: facForm.is_tourist_friendly,
+        has_tahfiz: facForm.has_tahfiz,
+        has_library: facForm.has_library,
+      };
+      if (facForm.terawih_rakaat) payload.terawih_rakaat = parseInt(facForm.terawih_rakaat);
+      if (facForm.has_iftar && facForm.iftar_type) payload.iftar_type = facForm.iftar_type;
+      if (facForm.cooling_system) payload.cooling_system = facForm.cooling_system;
+      if (facForm.kucing_count) payload.kucing_count = facForm.kucing_count;
+      if (facForm.karpet_vibe) payload.karpet_vibe = facForm.karpet_vibe;
+      if (facForm.parking_level) payload.parking_level = facForm.parking_level;
+      if (facForm.has_clean_telekung && facForm.telekung_rating) payload.telekung_rating = facForm.telekung_rating;
+      if (facForm.toilet_cleanliness) payload.toilet_cleanliness = facForm.toilet_cleanliness;
+      if (facForm.toilet_floor_condition) payload.toilet_floor_condition = facForm.toilet_floor_condition;
+
+      const hasExisting = !!(facilitiesData);
+      return hasExisting
+        ? facilitiesApi.update(id!, payload)
+        : facilitiesApi.create(id!, payload);
+    },
+    onSuccess: () => {
+      toast({ title: "Kemudahan disimpan! ✨", description: "+10 mata reputasi." });
+      setFacOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["masjid", id] });
+      refetchFacilities();
+    },
+    onError: (e) => {
+      toast({ title: "Gagal simpan kemudahan", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
     },
   });
 
   // ── check in ──────────────────────────────────────────────────
   const handleCheckIn = async (visitType: string) => {
-    if (!user) {
-      toast({ title: "Log masuk diperlukan", variant: "destructive" });
-      navigate("/auth");
-      return;
-    }
+    if (!user) { toast({ title: "Log masuk diperlukan", variant: "destructive" }); navigate("/auth"); return; }
     if (!navigator.geolocation) {
-      toast({ title: "GPS tidak disokong", description: "Pelayar anda tidak menyokong geolokasi.", variant: "destructive" });
-      return;
+      toast({ title: "GPS tidak disokong", variant: "destructive" }); return;
     }
     setCheckingIn(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           const result = await checkinsApi.checkIn({
-            masjidId: id!,
-            visitType,
+            masjidId: id!, visitType,
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
-          }) as { streak_count?: number; points_earned?: number; badges_unlocked?: string[] };
+          }) as { streak_count?: number; points_earned?: number };
           toast({
-            title: `Check-in berjaya! ���`,
+            title: `Check-in berjaya! 🎉`,
             description: `+${result.points_earned ?? 0} mata. Streak: ${result.streak_count ?? 0} hari.`,
           });
+          queryClient.invalidateQueries({ queryKey: ["checkins"] });
         } catch (e) {
-          const msg = e instanceof ApiError
-            ? e.message
-            : "Gagal check-in. Pastikan anda berada dalam 200m dari masjid.";
+          const msg = e instanceof ApiError ? e.message : "Gagal check-in. Pastikan anda berada dalam 200m dari masjid.";
           toast({ title: "Gagal check-in", description: msg, variant: "destructive" });
-        } finally {
-          setCheckingIn(false);
-        }
+        } finally { setCheckingIn(false); }
       },
-      () => {
-        toast({ title: "GPS diperlukan", description: "Sila benarkan akses GPS.", variant: "destructive" });
-        setCheckingIn(false);
-      }
+      () => { toast({ title: "GPS diperlukan", description: "Sila benarkan akses GPS.", variant: "destructive" }); setCheckingIn(false); }
     );
   };
 
   const handleVote = (type: "upvote" | "downvote") => {
-    if (!user) {
-      toast({ title: "Log masuk diperlukan", variant: "destructive" });
-      navigate("/auth");
+    if (!user) { toast({ title: "Log masuk diperlukan", variant: "destructive" }); navigate("/auth"); return; }
+    if (type === "downvote") {
+      setDownvoteReason("");
+      setDownvoteOpen(true);
       return;
     }
-    voteMutation.mutate(type);
+    voteMutation.mutate({ voteType: type });
+  };
+
+  const openFacSheet = () => {
+    const f = (facilitiesData as Facilities | null) ?? null;
+    if (f) {
+      setFacForm({
+        terawih_rakaat: f.terawih_rakaat ? String(f.terawih_rakaat) as "8" | "11" | "20" | "23" : "",
+        has_iftar: f.has_iftar ?? false,
+        iftar_type: f.iftar_type ?? "",
+        cooling_system: f.cooling_system ?? "Kipas Biasa",
+        has_coway: f.has_coway ?? false,
+        kucing_count: f.kucing_count ?? "Tidak Pasti",
+        karpet_vibe: f.karpet_vibe ?? "",
+        parking_level: f.parking_level ?? "",
+        has_parking_oku: f.has_parking_oku ?? false,
+        has_parking_moto: f.has_parking_moto ?? true,
+        has_kids_area: f.has_kids_area ?? false,
+        is_family_friendly: f.is_family_friendly ?? true,
+        has_clean_telekung: f.has_clean_telekung ?? false,
+        telekung_rating: f.telekung_rating ?? "",
+        wudhu_seating: f.wudhu_seating ?? false,
+        toilet_cleanliness: f.toilet_cleanliness ?? "",
+        toilet_floor_condition: f.toilet_floor_condition ?? "",
+        is_tourist_friendly: f.is_tourist_friendly ?? false,
+        has_tahfiz: f.has_tahfiz ?? false,
+        has_library: f.has_library ?? false,
+      });
+    } else {
+      setFacForm(defaultFacForm);
+    }
+    setFacOpen(true);
   };
 
   // ── loading / error states ────────────────────────────────────
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="flex items-center justify-center py-40">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  if (isLoading) return (
+    <div className="min-h-screen bg-background"><Header />
+      <div className="flex items-center justify-center py-40"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    <Footer /></div>
+  );
 
-  if (isError || !masjid) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 py-20 text-center">
-          <h2 className="font-serif text-2xl font-bold">Masjid tidak dijumpai</h2>
-          <Button asChild className="mt-4 rounded-xl"><Link to="/browse">Kembali ke senarai</Link></Button>
-        </div>
-        <Footer />
+  if (isError || !masjid) return (
+    <div className="min-h-screen bg-background"><Header />
+      <div className="container mx-auto px-4 py-20 text-center">
+        <h2 className="font-serif text-2xl font-bold">Masjid tidak dijumpai</h2>
+        <Button asChild className="mt-4 rounded-xl"><Link to="/browse">Kembali ke senarai</Link></Button>
       </div>
-    );
-  }
+    <Footer /></div>
+  );
 
   const m = masjid as unknown as Masjid;
-  const f = m.facilities as Facilities | null;
+  const f = (facilitiesData as Facilities | null) ?? null;
   const isVerified = m.status === "verified";
   const live = liveStatus as LiveStatus | undefined;
+  const photos = (mediaItems ?? []).filter((i) => ["main_photo", "interior_photo", "toilet_photo"].includes(i.media_type));
+  const qrItems = (mediaItems ?? []).filter((i) => ["qr_tng", "qr_duitnow", "masjid_board"].includes(i.media_type));
+  const mainPhoto = photos.find((i) => i.media_type === "main_photo");
 
   return (
     <div className="min-h-screen bg-background">
@@ -155,15 +387,47 @@ const MasjidDetail = () => {
         </Link>
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Main */}
+          {/* ── Main column ── */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Placeholder image */}
-            <div className="h-64 md:h-80 rounded-2xl overflow-hidden bg-secondary flex items-center justify-center">
-              <div className="text-center">
-                <Moon className="mx-auto h-16 w-16 text-muted-foreground/20" />
-                <p className="mt-2 text-sm text-muted-foreground">Belum ada gambar</p>
-              </div>
+            {/* Photo / hero */}
+            <div className="relative h-64 md:h-80 rounded-2xl overflow-hidden bg-secondary">
+              {mainPhoto ? (
+                <img src={mainPhoto.url} alt={m.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2">
+                  <Moon className="h-16 w-16 text-muted-foreground/20" />
+                  <p className="text-sm text-muted-foreground">Belum ada gambar</p>
+                </div>
+              )}
+              {user && (
+                <button
+                  onClick={() => setMediaOpen(true)}
+                  className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-xl bg-black/60 px-3 py-2 text-xs font-medium text-white backdrop-blur-sm hover:bg-black/80 transition-colors"
+                >
+                  <Camera className="h-3.5 w-3.5" /> Tambah Gambar
+                </button>
+              )}
             </div>
+
+            {/* Extra photos */}
+            {photos.length > 1 && (
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {photos.map((p) => (
+                  <div key={p.id} className="relative flex-shrink-0 group">
+                    <img src={p.url} alt={MEDIA_LABELS[p.media_type as MediaType]} className="h-20 w-32 rounded-xl object-cover border" />
+                    {p.created_by === user?.id && (
+                      <button
+                        onClick={() => mediaDeleteMutation.mutate(p.id)}
+                        className="absolute top-1 right-1 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                    <p className="text-xs text-center text-muted-foreground mt-1">{MEDIA_LABELS[p.media_type as MediaType]}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Info */}
             <div>
@@ -175,7 +439,7 @@ const MasjidDetail = () => {
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="font-sans mt-1">
-                    Belum disahkan ({m.verification_count}/3)
+                    Belum disahkan ({(verifyStatus as VerificationStatus | undefined)?.verification_count ?? m.verification_count}/3)
                   </Badge>
                 )}
               </div>
@@ -192,90 +456,161 @@ const MasjidDetail = () => {
               <div className="rounded-2xl border bg-card p-6">
                 <h3 className="font-serif text-lg font-semibold mb-3">Status Terkini</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  {live.crowd_level && (
-                    <div className="rounded-xl bg-primary/5 p-3">
-                      <p className="text-xs text-muted-foreground">Kepadatan</p>
-                      <p className="font-medium">{live.crowd_level}</p>
-                    </div>
-                  )}
-                  {live.saf_status && (
-                    <div className="rounded-xl bg-primary/5 p-3">
-                      <p className="text-xs text-muted-foreground">Status Saf</p>
-                      <p className="font-medium">{live.saf_status}</p>
-                    </div>
-                  )}
-                  {live.parking_status && (
-                    <div className="rounded-xl bg-primary/5 p-3">
-                      <p className="text-xs text-muted-foreground">Parking</p>
-                      <p className="font-medium">{live.parking_status}</p>
-                    </div>
-                  )}
-                  {live.iftar_menu && (
-                    <div className="rounded-xl bg-primary/5 p-3">
-                      <p className="text-xs text-muted-foreground">Menu Iftar</p>
-                      <p className="font-medium">{live.iftar_menu}</p>
-                    </div>
-                  )}
+                  {live.crowd_level && <div className="rounded-xl bg-primary/5 p-3"><p className="text-xs text-muted-foreground">Kepadatan</p><p className="font-medium">{live.crowd_level}</p></div>}
+                  {live.saf_status && <div className="rounded-xl bg-primary/5 p-3"><p className="text-xs text-muted-foreground">Status Saf</p><p className="font-medium">{live.saf_status}</p></div>}
+                  {live.parking_status && <div className="rounded-xl bg-primary/5 p-3"><p className="text-xs text-muted-foreground">Parking</p><p className="font-medium">{live.parking_status}</p></div>}
+                  {live.iftar_menu && <div className="rounded-xl bg-primary/5 p-3"><p className="text-xs text-muted-foreground">Menu Iftar</p><p className="font-medium">{live.iftar_menu}</p></div>}
                 </div>
               </div>
             )}
 
             {/* Facilities */}
-            {f && (
-              <div className="rounded-2xl border bg-card p-6">
-                <h3 className="font-serif text-lg font-semibold mb-4">Kemudahan & Info</h3>
+            <div className="rounded-2xl border bg-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-serif text-lg font-semibold">Kemudahan & Info</h3>
+                {user && (
+                  <Button variant="outline" size="sm" onClick={openFacSheet} className="rounded-lg gap-2 text-xs">
+                    <Plus className="h-3.5 w-3.5" />
+                    {f ? "Kemaskini" : "Tambah Kemudahan"}
+                  </Button>
+                )}
+              </div>
+
+              {!f ? (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground text-sm">Belum ada maklumat kemudahan.</p>
+                  {user ? (
+                    <Button variant="ghost" size="sm" onClick={openFacSheet} className="mt-3 text-primary gap-1">
+                      <Plus className="h-4 w-4" /> Jadi yang pertama tambah!
+                    </Button>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <Link to="/auth" className="text-primary underline">Log masuk</Link> untuk tambah kemudahan
+                    </p>
+                  )}
+                </div>
+              ) : (
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   {f.has_iftar && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <Utensils className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="font-medium">Iftar</p>
-                        {f.iftar_type && <p className="text-xs text-muted-foreground">{f.iftar_type}</p>}
-                      </div>
+                      <Utensils className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div><p className="font-medium">Iftar</p>{f.iftar_type && <p className="text-xs text-muted-foreground">{f.iftar_type}</p>}</div>
                     </div>
                   )}
                   {f.terawih_rakaat && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <Moon className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="font-medium">Terawih</p>
-                        <p className="text-xs text-muted-foreground">{f.terawih_rakaat} rakaat</p>
-                      </div>
+                      <Moon className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div><p className="font-medium">Terawih</p><p className="text-xs text-muted-foreground">{f.terawih_rakaat} rakaat</p></div>
                     </div>
                   )}
-                  {f.cooling_system && f.cooling_system !== "Tiada" && (
+                  {f.cooling_system && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <Wind className="h-4 w-4 text-primary" />
+                      <Wind className="h-4 w-4 text-primary flex-shrink-0" />
                       <p className="font-medium">{f.cooling_system}</p>
                     </div>
                   )}
-                  {f.kucing_count && f.kucing_count !== "Tiada" && (
+                  {f.kucing_count && f.kucing_count !== "Takda" && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <Cat className="h-4 w-4 text-primary" />
+                      <Cat className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div><p className="font-medium">Kucing</p><p className="text-xs text-muted-foreground">{f.kucing_count}</p></div>
+                    </div>
+                  )}
+                  {f.karpet_vibe && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🕌</span>
+                      <div><p className="font-medium">Karpet</p><p className="text-xs text-muted-foreground">{f.karpet_vibe}</p></div>
+                    </div>
+                  )}
+                  {f.parking_level && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Car className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div><p className="font-medium">Parking</p><p className="text-xs text-muted-foreground">{f.parking_level}</p></div>
+                    </div>
+                  )}
+                  {f.toilet_cleanliness && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <Droplets className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div><p className="font-medium">Tandas</p><p className="text-xs text-muted-foreground">{f.toilet_cleanliness}</p></div>
+                    </div>
+                  )}
+                  {f.has_clean_telekung && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🧕</span>
                       <div>
-                        <p className="font-medium">Kucing</p>
-                        <p className="text-xs text-muted-foreground">{f.kucing_count}</p>
+                        <p className="font-medium">Telekung</p>
+                        {f.telekung_rating && <p className="text-xs text-muted-foreground">{f.telekung_rating}</p>}
                       </div>
                     </div>
                   )}
                   {f.is_family_friendly && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <Users className="h-4 w-4 text-primary" />
+                      <Users className="h-4 w-4 text-primary flex-shrink-0" />
                       <p className="font-medium">Mesra Keluarga</p>
                     </div>
                   )}
                   {f.has_kids_area && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <Users className="h-4 w-4 text-primary" />
+                      <Users className="h-4 w-4 text-primary flex-shrink-0" />
                       <p className="font-medium">Ruang Kanak-kanak</p>
                     </div>
                   )}
-                  {f.parking_level && (
+                  {f.has_coway && (
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      <p className="font-medium">Parking: {f.parking_level}</p>
+                      <span className="text-base">💧</span>
+                      <p className="font-medium">Ada Coway</p>
                     </div>
                   )}
+                  {f.wudhu_seating && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🪑</span>
+                      <p className="font-medium">Wudhu Duduk</p>
+                    </div>
+                  )}
+                  {f.has_tahfiz && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
+                      <p className="font-medium">Ada Tahfiz</p>
+                    </div>
+                  )}
+                  {f.has_library && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
+                      <p className="font-medium">Ada Perpustakaan</p>
+                    </div>
+                  )}
+                  {f.is_tourist_friendly && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🌍</span>
+                      <p className="font-medium">Mesra Pelancong</p>
+                    </div>
+                  )}
+                  {f.has_parking_moto && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🏍️</span>
+                      <p className="font-medium">Parking Moto</p>
+                    </div>
+                  )}
+                  {f.has_parking_oku && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">♿</span>
+                      <p className="font-medium">Parking OKU</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* QR / Documents */}
+            {qrItems.length > 0 && (
+              <div className="rounded-2xl border bg-card p-6">
+                <h3 className="font-serif text-lg font-semibold mb-4">QR & Papan Info</h3>
+                <div className="flex gap-3 flex-wrap">
+                  {qrItems.map((q) => (
+                    <div key={q.id} className="text-center">
+                      <img src={q.url} alt={MEDIA_LABELS[q.media_type as MediaType]} className="h-24 w-24 rounded-xl object-contain border" />
+                      <p className="text-xs text-muted-foreground mt-1">{MEDIA_LABELS[q.media_type as MediaType]}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -294,29 +629,30 @@ const MasjidDetail = () => {
                   onClick={() => handleVote("upvote")}
                   disabled={voteMutation.isPending}
                 >
-                  <ThumbsUp className="h-4 w-4" />
-                  Betul ({m.verification_count})
+                  <ThumbsUp className="h-4 w-4" /> Betul ({(verifyStatus as VerificationStatus | undefined)?.verification_count ?? m.verification_count})
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 gap-2 text-muted-foreground"
+                  className={`flex-1 gap-2 ${
+                    (verifyStatus as VerificationStatus | undefined)?.user_vote_type === "downvote"
+                      ? "border-destructive text-destructive"
+                      : "text-muted-foreground"
+                  }`}
                   onClick={() => handleVote("downvote")}
                   disabled={voteMutation.isPending}
                 >
-                  <ThumbsDown className="h-4 w-4" />
-                  Info salah
+                  <ThumbsDown className="h-4 w-4" /> Info salah
                 </Button>
               </div>
               {!user && (
                 <p className="mt-3 text-xs text-muted-foreground text-center">
-                  <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}
-                  untuk mengesahkan
+                  <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}untuk mengesahkan
                 </p>
               )}
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* ── Sidebar ── */}
           <div className="space-y-4">
             <div className="rounded-2xl border bg-card p-6">
               <h3 className="font-serif text-lg font-semibold mb-4">Statistik</h3>
@@ -326,7 +662,7 @@ const MasjidDetail = () => {
                     <CheckCircle className="h-5 w-5 text-accent" />
                   </div>
                   <div>
-                    <p className="font-semibold text-foreground">{m.verification_count}/3</p>
+                    <p className="font-semibold text-foreground">{(verifyStatus as VerificationStatus | undefined)?.verification_count ?? m.verification_count}/3</p>
                     <p className="text-xs text-muted-foreground">Pengesahan diterima</p>
                   </div>
                 </div>
@@ -356,14 +692,330 @@ const MasjidDetail = () => {
               )}
               {!user && (
                 <p className="text-center text-xs text-muted-foreground pt-1">
-                  <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}
-                  untuk check-in
+                  <Link to="/auth" className="text-primary font-semibold hover:underline">Log masuk</Link>{" "}untuk check-in
                 </p>
               )}
             </div>
+
+            {/* Report */}
+            {user && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReportOpen(true)}
+                className="w-full gap-2 text-muted-foreground hover:text-destructive justify-start px-4"
+              >
+                <Flag className="h-4 w-4" /> Laporkan Masjid Ini
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ── Downvote Reason Dialog ── */}
+      <Dialog open={downvoteOpen} onOpenChange={setDownvoteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Kenapa info ini salah?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Label>Sebab</Label>
+            <Textarea
+              value={downvoteReason}
+              onChange={(e) => setDownvoteReason(e.target.value)}
+              placeholder="Contoh: Alamat tidak tepat, masjid dah tutup, nama salah..."
+              className="mt-1.5 rounded-xl min-h-[100px]"
+              autoFocus
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Minimum 10 aksara</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDownvoteOpen(false)}>Batal</Button>
+            <Button
+              variant="destructive"
+              disabled={downvoteReason.trim().length < 10 || voteMutation.isPending}
+              onClick={() => {
+                voteMutation.mutate({ voteType: "downvote", reason: downvoteReason.trim() });
+                setDownvoteOpen(false);
+              }}
+            >
+              {voteMutation.isPending ? "Menghantar..." : "Hantar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Report Dialog ── */}
+      <Dialog open={reportOpen} onOpenChange={(open) => { setReportOpen(open); if (!open) { setReportType(""); setReportDesc(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Laporkan Masalah</DialogTitle>
+            {reportType === "wrong_info" && reportDesc && (
+              <p className="text-sm text-muted-foreground pt-1">
+                Undi anda direkod. Semak butiran laporan di bawah dan hantar untuk makluman admin.
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Jenis Masalah</Label>
+              <Select value={reportType} onValueChange={setReportType}>
+                <SelectTrigger className="mt-1.5 rounded-xl">
+                  <SelectValue placeholder="Pilih jenis masalah..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPORT_TYPES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Penerangan</Label>
+              <Textarea
+                value={reportDesc}
+                onChange={(e) => setReportDesc(e.target.value)}
+                placeholder="Terangkan masalah dengan lebih lanjut... (min 10 aksara)"
+                className="mt-1.5 rounded-xl min-h-[100px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportOpen(false)}>Batal</Button>
+            <Button
+              variant="destructive"
+              onClick={() => reportMutation.mutate()}
+              disabled={!reportType || reportDesc.length < 10 || reportMutation.isPending}
+            >
+              {reportMutation.isPending ? "Menghantar..." : "Hantar Laporan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Media Dialog ── */}
+      <Dialog open={mediaOpen} onOpenChange={setMediaOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Gambar / QR</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Jenis</Label>
+              <Select value={mediaType} onValueChange={(v) => setMediaType(v as MediaType)}>
+                <SelectTrigger className="mt-1.5 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(MEDIA_LABELS).map(([v, label]) => (
+                    <SelectItem key={v} value={v}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>URL Gambar</Label>
+              <Input
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder="https://..."
+                className="mt-1.5 rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Paste URL gambar yang anda upload (Imgur, Google Drive, dll)</p>
+            </div>
+            {mediaUrl.startsWith("http") && (
+              <img src={mediaUrl} alt="preview" className="rounded-xl max-h-40 object-cover w-full" onError={(e) => (e.currentTarget.style.display = "none")} />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMediaOpen(false)}>Batal</Button>
+            <Button
+              onClick={() => mediaMutation.mutate()}
+              disabled={!mediaUrl.startsWith("http") || mediaMutation.isPending}
+            >
+              {mediaMutation.isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Facilities Sheet ── */}
+      <Sheet open={facOpen} onOpenChange={setFacOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-serif">{f ? "Kemaskini Kemudahan" : "Tambah Kemudahan"}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-6 py-6">
+            {/* Terawih */}
+            <div>
+              <Label className="font-semibold">Terawih (berapa rakaat?)</Label>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {(["", "8", "11", "20", "23"] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setFacForm((f) => ({ ...f, terawih_rakaat: r }))}
+                    className={`rounded-full px-4 py-2 text-xs font-medium transition-colors border ${facForm.terawih_rakaat === r ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-muted-foreground border-transparent"}`}
+                  >
+                    {r === "" ? "Tiada" : `${r} rakaat`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cooling */}
+            <div>
+              <Label className="font-semibold">Sistem Penyejukan</Label>
+              <Select value={facForm.cooling_system} onValueChange={(v) => setFacForm((f) => ({ ...f, cooling_system: v }))}>
+                <SelectTrigger className="mt-2 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Full AC / Sejuk Gila", "AC Sebahagian", "Kipas Gergasi (HVLS)", "Kipas Biasa", "Panas"].map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Kucing */}
+            <div>
+              <Label className="font-semibold">Kucing 🐱</Label>
+              <Select value={facForm.kucing_count} onValueChange={(v) => setFacForm((f) => ({ ...f, kucing_count: v }))}>
+                <SelectTrigger className="mt-2 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["Banyak / Kucing Friendly", "Ada Seekor Oren", "Ada Sikit", "Takda", "Tidak Pasti"].map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Karpet */}
+            <div>
+              <Label className="font-semibold">Karpet Vibe</Label>
+              <Select value={facForm.karpet_vibe} onValueChange={(v) => setFacForm((f) => ({ ...f, karpet_vibe: v }))}>
+                <SelectTrigger className="mt-2 rounded-xl"><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                <SelectContent>
+                  {["Tebal / Selesa", "Standard", "Nipis", "Sajadah Sendiri"].map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Parking */}
+            <div>
+              <Label className="font-semibold">Tahap Parking</Label>
+              <Select value={facForm.parking_level} onValueChange={(v) => setFacForm((f) => ({ ...f, parking_level: v }))}>
+                <SelectTrigger className="mt-2 rounded-xl"><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                <SelectContent>
+                  {["Senang", "Sederhana", "Susah / Double Park"].map((v) => (
+                    <SelectItem key={v} value={v}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Toilet */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="font-semibold text-sm">Kebersihan Tandas</Label>
+                <Select value={facForm.toilet_cleanliness} onValueChange={(v) => setFacForm((f) => ({ ...f, toilet_cleanliness: v }))}>
+                  <SelectTrigger className="mt-2 rounded-xl"><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                  <SelectContent>
+                    {["Bersih", "Sederhana", "Kurang Bersih"].map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="font-semibold text-sm">Lantai Tandas</Label>
+                <Select value={facForm.toilet_floor_condition} onValueChange={(v) => setFacForm((f) => ({ ...f, toilet_floor_condition: v }))}>
+                  <SelectTrigger className="mt-2 rounded-xl"><SelectValue placeholder="Pilih..." /></SelectTrigger>
+                  <SelectContent>
+                    {["Kering", "Licin", "Basah"].map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Iftar */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={facForm.has_iftar}
+                  onCheckedChange={(c) => setFacForm((f) => ({ ...f, has_iftar: !!c }))}
+                />
+                <span className="font-semibold text-sm">Ada Iftar</span>
+              </label>
+              {facForm.has_iftar && (
+                <Select value={facForm.iftar_type} onValueChange={(v) => setFacForm((f) => ({ ...f, iftar_type: v }))}>
+                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Jenis iftar..." /></SelectTrigger>
+                  <SelectContent>
+                    {["Nasi Kotak", "Talam", "Buffet", "Bawa Sendiri", "Tidak Pasti"].map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Telekung */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <Checkbox
+                  checked={facForm.has_clean_telekung}
+                  onCheckedChange={(c) => setFacForm((f) => ({ ...f, has_clean_telekung: !!c }))}
+                />
+                <span className="font-semibold text-sm">Ada Telekung Bersih 🧕</span>
+              </label>
+              {facForm.has_clean_telekung && (
+                <Select value={facForm.telekung_rating} onValueChange={(v) => setFacForm((f) => ({ ...f, telekung_rating: v }))}>
+                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Kualiti telekung..." /></SelectTrigger>
+                  <SelectContent>
+                    {["Banyak & Bersih", "Ada Tapi Sikit", "Bawa Sendiri"].map((v) => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Boolean checkboxes */}
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { key: "has_coway", label: "Ada Coway 💧" },
+                { key: "wudhu_seating", label: "Wudhu Boleh Duduk 🪑" },
+                { key: "has_kids_area", label: "Ruang Kanak-kanak" },
+                { key: "has_parking_moto", label: "Parking Moto 🏍️" },
+                { key: "has_parking_oku", label: "Parking OKU ♿" },
+                { key: "is_family_friendly", label: "Mesra Keluarga 👨‍👩‍👦" },
+                { key: "is_tourist_friendly", label: "Mesra Pelancong 🌍" },
+                { key: "has_tahfiz", label: "Ada Tahfiz 📖" },
+                { key: "has_library", label: "Ada Perpustakaan 📚" },
+              ] as { key: keyof typeof facForm; label: string }[]).map((item) => (
+                <label key={item.key} className="flex items-center gap-2 cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 text-sm">
+                  <Checkbox
+                    checked={!!facForm[item.key]}
+                    onCheckedChange={(c) => setFacForm((f) => ({ ...f, [item.key]: !!c }))}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+
+            <Button
+              className="w-full rounded-xl"
+              onClick={() => facMutation.mutate()}
+              disabled={facMutation.isPending}
+            >
+              {facMutation.isPending ? "Menyimpan..." : "Simpan Kemudahan"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Footer />
     </div>

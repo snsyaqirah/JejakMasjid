@@ -79,6 +79,7 @@ export const authApi = {
     password: string;
     fullName: string;
     phoneNumber?: string;
+    gender?: "Lelaki" | "Perempuan";
   }) =>
     request<{
       message: string;
@@ -257,6 +258,10 @@ export const verificationsApi = {
   getStatus: (masjidId: string) =>
     request<VerificationStatus>(`/api/v1/verifications/status/${masjidId}`),
 
+  // alias kept for backward compat
+  status: (masjidId: string) =>
+    request<VerificationStatus>(`/api/v1/verifications/status/${masjidId}`),
+
   report: (body: {
     masjidId: string;
     reportType: string;
@@ -266,6 +271,38 @@ export const verificationsApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  getMyReports: () =>
+    request<import("@/types").Report[]>("/api/v1/verifications/reports/mine"),
+};
+
+// ── Media ─────────────────────────────────────────────────────────
+
+export type MediaType = "main_photo" | "toilet_photo" | "interior_photo" | "qr_tng" | "qr_duitnow" | "masjid_board";
+
+export interface MediaItem {
+  id: string;
+  masjid_id: string;
+  media_type: MediaType;
+  url: string;
+  is_verified: boolean;
+  verification_count: number;
+  created_at: string;
+  created_by: string | null;
+}
+
+export const mediaApi = {
+  get: (masjidId: string) =>
+    request<MediaItem[]>(`/api/v1/masjids/${masjidId}/media`),
+
+  add: (masjidId: string, body: { media_type: MediaType; url: string }) =>
+    request<MediaItem>(`/api/v1/masjids/${masjidId}/media`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  remove: (masjidId: string, mediaId: string) =>
+    request(`/api/v1/masjids/${masjidId}/media/${mediaId}`, { method: "DELETE" }),
 };
 
 // ── Live Updates ──────────────────────────────────────────────────
@@ -325,24 +362,41 @@ export const profileApi = {
       id: string;
       full_name: string;
       phone_number: string | null;
+      gender: string | null;
       reputation_points: number;
       streak_count: number;
       longest_streak: number;
       last_checkin_at: string | null;
       created_at: string | null;
+      is_admin: boolean;
     }>("/api/v1/profile/me"),
 
-  update: (body: { full_name?: string; phone_number?: string }) =>
+  update: (body: { full_name?: string; phone_number?: string; gender?: "Lelaki" | "Perempuan" }) =>
     request<{
       id: string;
       full_name: string;
       phone_number: string | null;
+      gender: string | null;
       reputation_points: number;
       streak_count: number;
       longest_streak: number;
       last_checkin_at: string | null;
       created_at: string | null;
+      is_admin: boolean;
     }>("/api/v1/profile/me", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+};
+
+// ── Admin ────────────────────────────────────────────────────────
+
+export const adminApi = {
+  listReports: () =>
+    request<import("@/types").Report[]>("/api/v1/verifications/reports/all"),
+
+  resolveReport: (reportId: string, body: { status: string; resolution_notes?: string }) =>
+    request<import("@/types").Report>(`/api/v1/verifications/reports/${reportId}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
