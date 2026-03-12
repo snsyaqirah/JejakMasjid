@@ -30,10 +30,18 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
 
     # ── CORS ──────────────────────────────────────────────────────────────────
+    FRONTEND_URL: str = ""          # Set in production: https://your-app.vercel.app
     ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",    # Next.js dev
-        "http://localhost:5173",    # Vite dev (current FE)
+        "http://localhost:3000",
+        "http://localhost:5173",
     ]
+
+    @property
+    def cors_origins(self) -> list[str]:
+        origins = list(self.ALLOWED_ORIGINS)
+        if self.FRONTEND_URL and self.FRONTEND_URL not in origins:
+            origins.append(self.FRONTEND_URL)
+        return origins
 
     # ── Masjid verification ───────────────────────────────────────────────────
     MASJID_VERIFY_THRESHOLD: int = 3
