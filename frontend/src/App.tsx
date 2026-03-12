@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import InstallPrompt from "@/components/InstallPrompt";
+import FeedbackButton from "@/components/FeedbackButton";
 import Index from "./pages/Index";
 import BrowseMasjid from "./pages/BrowseMasjid";
 import MasjidDetail from "./pages/MasjidDetail";
@@ -27,6 +28,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <InstallPrompt />
+        <FeedbackButton />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Index />} />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, Link } from "react-router-dom";
-import { ShieldCheck, ExternalLink, CheckCircle2, XCircle, Clock, Loader2, Search, QrCode } from "lucide-react";
+import { ShieldCheck, ExternalLink, CheckCircle2, XCircle, Clock, Loader2, Search, QrCode, MessageSquare, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { adminApi, profileApi } from "@/lib/api";
+import { adminApi, profileApi, feedbackApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Report, ReportStatus } from "@/types";
 
@@ -51,7 +51,7 @@ export default function AdminPanel() {
   const [selected, setSelected] = useState<Report | null>(null);
   const [resolveStatus, setResolveStatus] = useState<string>("");
   const [resolveNotes, setResolveNotes] = useState("");
-  const [activeTab, setActiveTab] = useState<"reports" | "media">("reports");
+  const [activeTab, setActiveTab] = useState<"reports" | "media" | "feedback">("reports");
 
   // Check admin‑gated fetch — redirect if not admin
   const { data: profile, isLoading: loadingProfile } = useQuery({
@@ -81,6 +81,13 @@ export default function AdminPanel() {
     queryKey: ["admin", "pending-media"],
     queryFn: () => adminApi.listPendingMedia(),
     enabled: !!profile?.is_admin && activeTab === "media",
+  });
+
+  type FeedbackItem = { id: string; message: string; rating: number | null; page_url: string | null; name: string | null; user_id: string | null; created_at: string };
+  const { data: feedbackList, isLoading: loadingFeedback } = useQuery<FeedbackItem[]>({
+    queryKey: ["admin", "feedback"],
+    queryFn: () => feedbackApi.list(),
+    enabled: !!profile?.is_admin && activeTab === "feedback",
   });
 
   const approveMutation = useMutation({
@@ -149,6 +156,13 @@ export default function AdminPanel() {
             <QrCode className="h-4 w-4" /> Semak QR
             {pendingMedia && pendingMedia.length > 0 && <span className="rounded-full bg-amber-500 text-white text-xs px-1.5 py-0.5">{pendingMedia.length}</span>}
           </button>
+          <button
+            onClick={() => setActiveTab("feedback")}
+            className={`flex items-center gap-2 pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === "feedback" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            <MessageSquare className="h-4 w-4" /> Maklum Balas
+            {feedbackList && feedbackList.length > 0 && <span className="rounded-full bg-primary text-primary-foreground text-xs px-1.5 py-0.5">{feedbackList.length}</span>}
+          </button>
         </div>
 
         {/* ── Media Review Tab ── */}
@@ -185,6 +199,47 @@ export default function AdminPanel() {
                         <XCircle className="h-3.5 w-3.5" /> Tolak
                       </Button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Feedback Tab ── */}
+        {activeTab === "feedback" && (
+          <div>
+            {loadingFeedback ? (
+              <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            ) : !feedbackList || feedbackList.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">
+                <MessageSquare className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                Belum ada maklum balas
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">{feedbackList.length} maklum balas diterima.</p>
+                {feedbackList.map((fb) => (
+                  <div key={fb.id} className="rounded-xl border bg-card p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {fb.rating && (
+                          <div className="flex items-center gap-0.5">
+                            {[1,2,3,4,5].map((s) => (
+                              <Star key={s} className={`h-3.5 w-3.5 ${s <= fb.rating! ? "fill-amber-400 text-amber-400" : "text-muted-foreground/20"}`} />
+                            ))}
+                          </div>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {fb.name ?? (fb.user_id ? "Pengguna berdaftar" : "Tetamu")}
+                        </span>
+                        {fb.page_url && (
+                          <span className="text-xs text-muted-foreground bg-secondary rounded px-1.5 py-0.5 font-mono">{fb.page_url}</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{fmtDate(fb.created_at)}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed">{fb.message}</p>
                   </div>
                 ))}
               </div>

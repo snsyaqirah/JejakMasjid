@@ -446,3 +446,23 @@ export const adminApi = {
     request<{ success: boolean }>(`/api/v1/masjids/admin/media/${mediaId}/reject`, { method: "DELETE" }),
 };
 
+// ── Feedback ──────────────────────────────────────────────────────
+
+export const feedbackApi = {
+  submit: (body: { message: string; rating?: number; pageUrl?: string; name?: string }) =>
+    request<{ id: string }>("/api/v1/feedback", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  list: () =>
+    request<Array<{
+      id: string;
+      message: string;
+      rating: number | null;
+      page_url: string | null;
+      name: string | null;
+      user_id: string | null;
+      created_at: string;
+    }>>("/api/v1/feedback/admin"),
+};
