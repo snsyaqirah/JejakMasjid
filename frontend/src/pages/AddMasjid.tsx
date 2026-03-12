@@ -25,13 +25,36 @@ const AddMasjid = () => {
     description: "",
     latitude: "",
     longitude: "",
+    // Solat & Ibadah
     hasTerawih: false,
-    hasIftar: false,
-    hasOKUAccess: false,
-    hasKidsArea: false,
-    hasCoway: false,
     terawihRakaat: "",
+    has_tahfiz: false,
+    // Iftar
+    hasIftar: false,
+    iftar_type: "",
     iftarInfo: "",
+    // Keselesaan
+    cooling_system: "Kipas Biasa",
+    karpet_vibe: "",
+    // Ciri Malaysia
+    hasCoway: false,
+    kucing_count: "Tidak Pasti",
+    talam_gang: false,
+    // Parkir
+    parking_level: "",
+    hasOKUAccess: false,
+    has_parking_moto: true,
+    // Kemudahan Wanita
+    has_clean_telekung: false,
+    telekung_rating: "",
+    // Tandas & Wudhu
+    wudhu_seating: false,
+    toilet_cleanliness: "",
+    toilet_floor_condition: "",
+    // Keluarga & Lain-lain
+    hasKidsArea: false,
+    is_tourist_friendly: false,
+    has_library: false,
   });
 
   if (!user) return <Navigate to="/auth" replace />;
@@ -96,15 +119,26 @@ const AddMasjid = () => {
 
       // Save facilities data if any checkboxes were selected
       const hasFacilityData = form.hasTerawih || form.hasIftar || form.hasOKUAccess ||
-        form.hasKidsArea || form.hasCoway;
+        form.hasKidsArea || form.hasCoway || form.cooling_system !== "Kipas Biasa" ||
+        !!form.karpet_vibe || !!form.parking_level || form.has_clean_telekung ||
+        form.wudhu_seating || !!form.toilet_cleanliness || form.has_tahfiz || form.has_library;
       if (hasFacilityData) {
         try {
           const facilitiesPayload: Record<string, unknown> = {
             has_iftar: form.hasIftar,
             has_parking_oku: form.hasOKUAccess,
+            has_parking_moto: form.has_parking_moto,
             has_kids_area: form.hasKidsArea,
             has_coway: form.hasCoway,
             is_family_friendly: true,
+            cooling_system: form.cooling_system || "Kipas Biasa",
+            kucing_count: form.kucing_count || "Tidak Pasti",
+            talam_gang: form.talam_gang,
+            has_clean_telekung: form.has_clean_telekung,
+            wudhu_seating: form.wudhu_seating,
+            is_tourist_friendly: form.is_tourist_friendly,
+            has_tahfiz: form.has_tahfiz,
+            has_library: form.has_library,
           };
           if (form.hasTerawih && form.terawihRakaat) {
             facilitiesPayload.terawih_rakaat = parseInt(form.terawihRakaat);
@@ -112,6 +146,16 @@ const AddMasjid = () => {
           if (form.hasIftar && form.iftarInfo) {
             facilitiesPayload.iftar_menu = form.iftarInfo;
           }
+          if (form.hasIftar && form.iftar_type) {
+            facilitiesPayload.iftar_type = form.iftar_type;
+          }
+          if (form.karpet_vibe) facilitiesPayload.karpet_vibe = form.karpet_vibe;
+          if (form.parking_level) facilitiesPayload.parking_level = form.parking_level;
+          if (form.has_clean_telekung && form.telekung_rating) {
+            facilitiesPayload.telekung_rating = form.telekung_rating;
+          }
+          if (form.toilet_cleanliness) facilitiesPayload.toilet_cleanliness = form.toilet_cleanliness;
+          if (form.toilet_floor_condition) facilitiesPayload.toilet_floor_condition = form.toilet_floor_condition;
           await facilitiesApi.create(result.id, facilitiesPayload);
         } catch {
           // Non-critical: masjid is already saved, facilities can be added later
@@ -192,53 +236,214 @@ const AddMasjid = () => {
             </div>
           </div>
 
-          {/* Facilities (basic — can be updated later) */}
-          <div className="rounded-2xl border bg-card p-6 space-y-5">
+          {/* Facilities */}
+          <div className="rounded-2xl border bg-card p-6 space-y-6">
             <h3 className="font-serif text-base font-semibold">Kemudahan (Opsyen)</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { key: "hasTerawih", label: "Ada Terawih" },
-                { key: "hasIftar", label: "Ada Iftar" },
-                { key: "hasOKUAccess", label: "Mesra OKU" },
-                { key: "hasKidsArea", label: "Ruang Kanak-kanak" },
-                { key: "hasCoway", label: "Ada Coway" },
-              ].map((item) => (
-                <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
-                  <Checkbox
-                    checked={form[item.key as keyof typeof form] as boolean}
-                    onCheckedChange={(c) => setForm({ ...form, [item.key]: !!c })}
-                  />
-                  {item.label}
-                </label>
-              ))}
+
+            {/* Solat & Ibadah */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Solat & Ibadah</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: "hasTerawih", label: "Ada Terawih" },
+                  { key: "has_tahfiz", label: "Ada Tahfiz" },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
+                    <Checkbox checked={form[item.key as keyof typeof form] as boolean} onCheckedChange={(c) => setForm({ ...form, [item.key]: !!c })} />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+              {form.hasTerawih && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Terawih berapa rakaat?</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["8", "11", "20", "23"].map((r) => (
+                      <button key={r} type="button" onClick={() => setForm({ ...form, terawihRakaat: form.terawihRakaat === r ? "" : r })}
+                        className={`rounded-full px-4 py-2 text-xs font-medium transition-colors ${form.terawihRakaat === r ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                        {r} rakaat
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {form.hasTerawih && (
+            {/* Iftar */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Iftar</p>
+              <label className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors w-fit">
+                <Checkbox checked={form.hasIftar} onCheckedChange={(c) => setForm({ ...form, hasIftar: !!c })} />
+                Ada Program Iftar
+              </label>
+              {form.hasIftar && (
+                <div className="space-y-3 pl-1">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Jenis Iftar</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Nasi Kotak", "Talam", "Buffet", "Bawa Sendiri", "Tidak Pasti"].map((t) => (
+                        <button key={t} type="button" onClick={() => setForm({ ...form, iftar_type: form.iftar_type === t ? "" : t })}
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.iftar_type === t ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Info Menu Iftar (Opsyen)</Label>
+                    <Input placeholder="cth: Nasi Beriyani + Air Sirap" value={form.iftarInfo} onChange={(e) => setForm({ ...form, iftarInfo: e.target.value })} className="rounded-xl bg-background" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Keselesaan */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Keselesaan</p>
               <div className="space-y-2">
-                <Label className="font-medium">Terawih berapa rakaat?</Label>
-                <div className="flex gap-2">
-                  {["8", "11", "20", "23"].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setForm({ ...form, terawihRakaat: form.terawihRakaat === r ? "" : r })}
-                      className={`rounded-full px-4 py-2 text-xs font-medium transition-colors ${
-                        form.terawihRakaat === r ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
-                      }`}
-                    >
-                      {r} rakaat
+                <Label className="text-sm font-medium">Sistem Pendingin</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Full AC / Sejuk Gila", "AC Sebahagian", "Kipas Gergasi (HVLS)", "Kipas Biasa", "Panas"].map((c) => (
+                    <button key={c} type="button" onClick={() => setForm({ ...form, cooling_system: c })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.cooling_system === c ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {c}
                     </button>
                   ))}
                 </div>
               </div>
-            )}
-
-            {form.hasIftar && (
               <div className="space-y-2">
-                <Label className="font-medium">Info Iftar</Label>
-                <Input placeholder="cth: Walk-in / Kena daftar dulu" value={form.iftarInfo} onChange={(e) => setForm({ ...form, iftarInfo: e.target.value })} className="rounded-xl bg-background" />
+                <Label className="text-sm font-medium">Vibe Karpet</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Tebal / Selesa", "Standard", "Nipis", "Sajadah Sendiri"].map((k) => (
+                    <button key={k} type="button" onClick={() => setForm({ ...form, karpet_vibe: form.karpet_vibe === k ? "" : k })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.karpet_vibe === k ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {k}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Ciri-ciri Malaysia */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ciri-ciri Malaysia 🇲🇾</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: "hasCoway", label: "Ada Coway 💧" },
+                  { key: "talam_gang", label: "Talam Gang 🍛" },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
+                    <Checkbox checked={form[item.key as keyof typeof form] as boolean} onCheckedChange={(c) => setForm({ ...form, [item.key]: !!c })} />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Status Kucing 🐈</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Banyak / Kucing Friendly", "Ada Seekor Oren", "Ada Sikit", "Takda", "Tidak Pasti"].map((k) => (
+                    <button key={k} type="button" onClick={() => setForm({ ...form, kucing_count: k })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.kucing_count === k ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Parkir */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Parkir</p>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Susah Nak Parking?</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Senang", "Sederhana", "Susah / Double Park"].map((p) => (
+                    <button key={p} type="button" onClick={() => setForm({ ...form, parking_level: form.parking_level === p ? "" : p })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.parking_level === p ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: "hasOKUAccess", label: "Parking OKU" },
+                  { key: "has_parking_moto", label: "Parking Motor" },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
+                    <Checkbox checked={form[item.key as keyof typeof form] as boolean} onCheckedChange={(c) => setForm({ ...form, [item.key]: !!c })} />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Kemudahan Wanita */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kemudahan Wanita</p>
+              <label className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors w-fit">
+                <Checkbox checked={form.has_clean_telekung} onCheckedChange={(c) => setForm({ ...form, has_clean_telekung: !!c })} />
+                Ada Telekung Bersih
+              </label>
+              {form.has_clean_telekung && (
+                <div className="flex flex-wrap gap-2">
+                  {["Banyak & Bersih", "Ada Tapi Sikit", "Bawa Sendiri"].map((t) => (
+                    <button key={t} type="button" onClick={() => setForm({ ...form, telekung_rating: form.telekung_rating === t ? "" : t })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.telekung_rating === t ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tandas & Wudhu */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tandas & Wudhu</p>
+              <label className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors w-fit">
+                <Checkbox checked={form.wudhu_seating} onCheckedChange={(c) => setForm({ ...form, wudhu_seating: !!c })} />
+                Tempat Duduk Wudhu
+              </label>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Kebersihan Tandas</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Bersih", "Sederhana", "Kurang Bersih"].map((t) => (
+                    <button key={t} type="button" onClick={() => setForm({ ...form, toilet_cleanliness: form.toilet_cleanliness === t ? "" : t })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.toilet_cleanliness === t ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Lantai Tandas</Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Kering", "Licin", "Basah"].map((t) => (
+                    <button key={t} type="button" onClick={() => setForm({ ...form, toilet_floor_condition: form.toilet_floor_condition === t ? "" : t })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.toilet_floor_condition === t ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Keluarga & Lain-lain */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Keluarga & Lain-lain</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { key: "hasKidsArea", label: "Ruang Kanak-kanak" },
+                  { key: "is_tourist_friendly", label: "Mesra Pelancong" },
+                  { key: "has_library", label: "Ada Perpustakaan" },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
+                    <Checkbox checked={form[item.key as keyof typeof form] as boolean} onCheckedChange={(c) => setForm({ ...form, [item.key]: !!c })} />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
 
           <Button type="submit" size="lg" disabled={submitting} className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold py-6 text-base">
