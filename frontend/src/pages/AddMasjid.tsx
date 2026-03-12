@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { MapPin, ArrowLeft, LocateFixed } from "lucide-react";
+import { useState, useRef } from "react";
+import { MapPin, ArrowLeft, LocateFixed, Search, X, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,12 +13,58 @@ import { useAuth } from "@/contexts/AuthContext";
 import { masjidsApi, facilitiesApi, ApiError } from "@/lib/api";
 import { MALAYSIA_STATES } from "@/lib/constants";
 
+type NominatimResult = {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  name?: string;
+};
+
 const AddMasjid = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResults, setPlaceResults] = useState<NominatimResult[]>([]);
+  const [searchingPlace, setSearchingPlace] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handlePlaceSearch = (query: string) => {
+    setPlaceQuery(query);
+    setShowDropdown(true);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (query.length < 3) { setPlaceResults([]); return; }
+    searchTimeout.current = setTimeout(async () => {
+      setSearchingPlace(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&countrycodes=my&addressdetails=1`,
+          { headers: { "Accept-Language": "ms,en" } }
+        );
+        const data: NominatimResult[] = await res.json();
+        setPlaceResults(data);
+      } catch { /* silent */ } finally {
+        setSearchingPlace(false);
+      }
+    }, 400);
+  };
+
+  const selectPlace = (place: NominatimResult) => {
+    setForm((f) => ({
+      ...f,
+      latitude: parseFloat(place.lat).toFixed(6),
+      longitude: parseFloat(place.lon).toFixed(6),
+      address: f.address || place.display_name,
+      name: f.name || (place.name ?? ""),
+    }));
+    setPlaceQuery(place.display_name);
+    setPlaceResults([]);
+    setShowDropdown(false);
+  };
   const [form, setForm] = useState({
     name: "",
     address: "",
@@ -211,23 +257,75 @@ const AddMasjid = () => {
               <Input id="address" placeholder="cth: No 1, Jalan Masjid, Taman Sri Muda, 40150 Shah Alam, Selangor" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-xl bg-background" required />
             </div>
 
-            <div className="space-y-2">
-              <Label className="font-medium">Koordinat GPS *</Label>
+            <div className="space-y-3">
+              <Label className="font-medium">Lokasi Masjid</Label>
+
+              {/* Place search */}
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Cari nama masjid di sini..."
+                    value={placeQuery}
+                    onChange={(e) => handlePlaceSearch(e.target.value)}
+                    onFocus={() => placeResults.length > 0 && setShowDropdown(true)}
+                    className="rounded-xl bg-background pl-9 pr-9"
+                    autoComplete="off"
+                  />
+                  {placeQuery && (
+                    <button type="button" onClick={() => { setPlaceQuery(""); setPlaceResults([]); setShowDropdown(false); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {showDropdown && (searchingPlace || placeResults.length > 0) && (
+                  <div className="absolute z-50 mt-1 w-full rounded-xl border bg-card shadow-lg overflow-hidden">
+                    {searchingPlace && (
+                      <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Mencari...
+                      </div>
+                    )}
+                    {!searchingPlace && placeResults.map((place) => (
+                      <button key={place.place_id} type="button"
+                        onClick={() => selectPlace(place)}
+                        className="w-full text-left px-4 py-3 text-sm hover:bg-secondary transition-colors border-b last:border-0">
+                        <p className="font-medium text-foreground line-clamp-1">{place.name || place.display_name.split(",")[0]}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{place.display_name}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">atau</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
               <Button type="button" variant="outline" className="w-full rounded-xl gap-2" onClick={detectLocation} disabled={locating}>
                 <LocateFixed className="h-4 w-4" />
-                {locating ? "Mengesan lokasi..." : "Gunakan Lokasi Semasa (GPS)"}
+                {locating ? "Mengesan lokasi..." : "Gunakan GPS Semasa"}
               </Button>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="lat" className="text-xs text-muted-foreground">Latitud</Label>
-                  <Input id="lat" placeholder="3.139003" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} className="rounded-xl bg-background" />
+
+              {(form.latitude || form.longitude) && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="lat" className="text-xs text-muted-foreground">Latitud</Label>
+                    <Input id="lat" placeholder="3.139003" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} className="rounded-xl bg-background" />
+                  </div>
+                  <div>
+                    <Label htmlFor="lng" className="text-xs text-muted-foreground">Longitud</Label>
+                    <Input id="lng" placeholder="101.686855" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} className="rounded-xl bg-background" />
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="lng" className="text-xs text-muted-foreground">Longitud</Label>
-                  <Input id="lng" placeholder="101.686855" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} className="rounded-xl bg-background" />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">Koordinat diperlukan untuk ciri berdekatan & check-in</p>
+              )}
+              {form.latitude && form.longitude ? (
+                <p className="text-xs text-emerald-600 font-medium">✓ Koordinat diisi: {form.latitude}, {form.longitude}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Koordinat diperlukan untuk ciri berdekatan & check-in</p>
+              )}
             </div>
 
             <div className="space-y-2">
