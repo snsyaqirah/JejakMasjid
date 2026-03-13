@@ -80,6 +80,9 @@ const defaultFacForm = {
   is_tourist_friendly: false,
   has_tahfiz: false,
   has_library: false,
+  near_bas: false,
+  near_lrt: false,
+  near_mrt: false,
 };
 
 const MasjidDetail = () => {
@@ -282,6 +285,9 @@ const MasjidDetail = () => {
         is_tourist_friendly: facForm.is_tourist_friendly,
         has_tahfiz: facForm.has_tahfiz,
         has_library: facForm.has_library,
+        near_bas: facForm.near_bas,
+        near_lrt: facForm.near_lrt,
+        near_mrt: facForm.near_mrt,
       };
       if (facForm.terawih_rakaat) payload.terawih_rakaat = parseInt(facForm.terawih_rakaat);
       if (facForm.has_iftar && facForm.iftar_type) payload.iftar_type = facForm.iftar_type;
@@ -383,6 +389,9 @@ const MasjidDetail = () => {
         is_tourist_friendly: f.is_tourist_friendly ?? false,
         has_tahfiz: f.has_tahfiz ?? false,
         has_library: f.has_library ?? false,
+        near_bas: f.near_bas ?? false,
+        near_lrt: f.near_lrt ?? false,
+        near_mrt: f.near_mrt ?? false,
       });
     } else {
       setFacForm(defaultFacForm);
@@ -635,6 +644,24 @@ const MasjidDetail = () => {
                     <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
                       <span className="text-base">♿</span>
                       <p className="font-medium">Parking OKU</p>
+                    </div>
+                  )}
+                  {f.near_bas && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🚌</span>
+                      <p className="font-medium">Berhampiran Bas</p>
+                    </div>
+                  )}
+                  {f.near_lrt && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🚇</span>
+                      <p className="font-medium">Berhampiran LRT</p>
+                    </div>
+                  )}
+                  {f.near_mrt && (
+                    <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-3">
+                      <span className="text-base">🚊</span>
+                      <p className="font-medium">Berhampiran MRT</p>
                     </div>
                   )}
                 </div>
@@ -1127,6 +1154,9 @@ const MasjidDetail = () => {
                 { key: "has_kids_area", label: "Ruang Kanak-kanak" },
                 { key: "has_parking_moto", label: "Parking Moto 🏍️" },
                 { key: "has_parking_oku", label: "Parking OKU ♿" },
+                { key: "near_bas", label: "Berhampiran Bas 🚌" },
+                { key: "near_lrt", label: "Berhampiran LRT 🚇" },
+                { key: "near_mrt", label: "Berhampiran MRT 🚊" },
                 { key: "is_family_friendly", label: "Mesra Keluarga 👨‍👩‍👦" },
                 { key: "is_tourist_friendly", label: "Mesra Pelancong 🌍" },
                 { key: "has_tahfiz", label: "Ada Tahfiz 📖" },

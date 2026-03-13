@@ -66,6 +66,11 @@ class FacilitiesCreate(CamelModel):
     has_tahfiz: bool = False
     has_library: bool = False
 
+    # Public Transport
+    near_bas: bool = False
+    near_lrt: bool = False
+    near_mrt: bool = False
+
 
 class FacilitiesUpdate(FacilitiesCreate):
     """Same as create - all fields optional."""
@@ -102,6 +107,9 @@ class FacilitiesResponse(CamelModel):
     is_tourist_friendly: bool
     has_tahfiz: bool
     has_library: bool
+    near_bas: bool
+    near_lrt: bool
+    near_mrt: bool
     
     # Audit fields
     created_at: datetime

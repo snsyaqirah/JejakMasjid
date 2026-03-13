@@ -32,6 +32,9 @@ export interface Facilities {
   is_tourist_friendly: boolean;
   has_tahfiz: boolean;
   has_library: boolean;
+  near_bas: boolean;
+  near_lrt: boolean;
+  near_mrt: boolean;
 }
 
 export interface Masjid {

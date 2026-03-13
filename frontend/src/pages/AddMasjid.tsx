@@ -101,6 +101,10 @@ const AddMasjid = () => {
     hasKidsArea: false,
     is_tourist_friendly: false,
     has_library: false,
+    // Pengangkutan Awam
+    near_bas: false,
+    near_lrt: false,
+    near_mrt: false,
   });
 
   if (!user) return <Navigate to="/auth" replace />;
@@ -185,6 +189,9 @@ const AddMasjid = () => {
             is_tourist_friendly: form.is_tourist_friendly,
             has_tahfiz: form.has_tahfiz,
             has_library: form.has_library,
+            near_bas: form.near_bas,
+            near_lrt: form.near_lrt,
+            near_mrt: form.near_mrt,
           };
           if (form.hasTerawih && form.terawihRakaat) {
             facilitiesPayload.terawih_rakaat = parseInt(form.terawihRakaat);
@@ -467,6 +474,9 @@ const AddMasjid = () => {
                 {[
                   { key: "hasOKUAccess", label: "Parking OKU" },
                   { key: "has_parking_moto", label: "Parking Motor" },
+                  { key: "near_bas", label: "Berhampiran Bas 🚌" },
+                  { key: "near_lrt", label: "Berhampiran LRT 🚇" },
+                  { key: "near_mrt", label: "Berhampiran MRT 🚊" },
                 ].map((item) => (
                   <label key={item.key} className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border p-3 hover:bg-secondary/50 transition-colors">
                     <Checkbox checked={form[item.key as keyof typeof form] as boolean} onCheckedChange={(c) => setForm({ ...form, [item.key]: !!c })} />
