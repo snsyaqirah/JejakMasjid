@@ -173,7 +173,7 @@ const Auth = () => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode.length < 8) {
+    if (otpCode.length < 4) {
       toast({ title: "Kod tidak sah", description: "Masukkan kod pengesahan dari email anda.", variant: "destructive" });
       return;
     }
@@ -245,14 +245,14 @@ const Auth = () => {
                     <Input
                       id="otp"
                       value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
                       placeholder="12345678"
                       maxLength={8}
                       className="mt-1.5 text-center text-2xl tracking-widest font-mono"
                       autoFocus
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || otpCode.length < 8}>
+                  <Button type="submit" className="w-full" disabled={loading || otpCode.length < 4}>
                     {loading ? "Mengesahkan..." : "Sahkan"}
                   </Button>
                 </form>

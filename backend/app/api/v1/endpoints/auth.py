@@ -27,7 +27,7 @@ async def sign_up(
 ):
     """
     Register new user with email verification.
-    Sends 8-digit OTP code to email.
+    Sends OTP code to email.
     """
     try:
         # Sign up with Supabase Auth
@@ -91,7 +91,7 @@ async def verify_otp(
     supabase: Client = Depends(get_supabase)
 ):
     """
-    Verify email using 6-digit OTP code.
+    Verify email using OTP code.
     Returns JWT tokens on success.
     """
     try:

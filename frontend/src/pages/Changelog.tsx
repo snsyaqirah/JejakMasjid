@@ -51,7 +51,7 @@ const releases: Release[] = [
     label: "major",
     summary: "Pelancaran pertama JejakMasjid! 🎉",
     changes: [
-      { type: "new", text: "Daftar akaun dengan pengesahan emel (OTP 8 digit)." },
+      { type: "new", text: "Daftar akaun dengan pengesahan emel (OTP kod)." },
       { type: "new", text: "Tambah masjid baru dengan semakan radius 100m untuk elak duplikat." },
       { type: "new", text: "Check-in berasaskan GPS — perlu berada dalam 200m dari masjid." },
       { type: "new", text: "Sistem kemudahan masjid: Coway, kucing, karpet vibe, parkir, tandas, dan banyak lagi." },

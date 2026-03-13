@@ -29,7 +29,7 @@ class SignUpResponse(CamelModel):
 class VerifyOTPRequest(CamelModel):
     """OTP code verification."""
     email: EmailStr
-    token: str = Field(min_length=6, max_length=8, description="6 or 8 digit code")
+    token: str = Field(min_length=4, max_length=10, description="OTP code")
 
 
 class VerifyOTPResponse(CamelModel):
