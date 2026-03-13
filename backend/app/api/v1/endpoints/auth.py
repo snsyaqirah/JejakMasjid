@@ -27,7 +27,7 @@ async def sign_up(
 ):
     """
     Register new user with email verification.
-    Sends 6-digit OTP code to email.
+    Sends 8-digit OTP code to email.
     """
     try:
         # Sign up with Supabase Auth
@@ -284,5 +284,21 @@ async def update_password(
         admin = get_supabase_admin()
         admin.auth.admin.update_user_by_id(current_user["id"], {"password": body.new_password})
         return MessageResponse(message="Kata laluan berjaya dikemaskini", success=True)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete("/account", response_model=MessageResponse)
+async def delete_account(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Permanently delete the authenticated user's account and all associated data.
+    """
+    try:
+        from app.core.supabase import get_supabase_admin
+        admin = get_supabase_admin()
+        admin.auth.admin.delete_user(current_user["id"])
+        return MessageResponse(message="Akaun anda telah dipadam. Selamat tinggal!", success=True)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -1,17 +1,20 @@
 import { useState, useEffect } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { User, Edit2, Save, X, Trophy, Calendar, MapPin, TrendingUp, Loader2, Flag, CheckCircle2, XCircle, Clock, Search } from "lucide-react";
+import { User, Edit2, Save, X, Trophy, Calendar, MapPin, TrendingUp, Loader2, Flag, CheckCircle2, XCircle, Clock, Search, Trash2, AlertTriangle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { profileApi, verificationsApi, ApiError } from "@/lib/api";
+import { profileApi, authApi, verificationsApi, ApiError } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { Report, ReportStatus } from "@/types";
 
@@ -44,11 +47,12 @@ const STATUS_CONFIG: Record<ReportStatus, { label: string; variant: "default" | 
 };
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ full_name: "", phone_number: "", gender: "" });
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (!user) return <Navigate to="/auth" replace />;
 
@@ -88,6 +92,21 @@ const Profile = () => {
     onError: (err) => {
       toast({
         title: "Gagal kemaskini",
+        description: err instanceof ApiError ? err.message : "Sila cuba lagi.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => authApi.deleteAccount(),
+    onSuccess: async () => {
+      toast({ title: "Akaun dipadam", description: "Akaun anda telah dipadam sepenuhnya." });
+      await logout();
+    },
+    onError: (err) => {
+      toast({
+        title: "Gagal padam akaun",
         description: err instanceof ApiError ? err.message : "Sila cuba lagi.",
         variant: "destructive",
       });
@@ -323,9 +342,51 @@ const Profile = () => {
                 </div>
               )}
             </div>
+            {/* Danger Zone */}
+            <div className="rounded-2xl border border-destructive/30 bg-card p-5">
+              <h3 className="font-semibold text-sm text-destructive mb-1 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" /> Zon Berbahaya
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Pemadaman akaun adalah kekal dan tidak boleh dipulihkan. Rekod sumbangan masjid anda yang bersifat awam mungkin dikekalkan sebagai rekod komuniti.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 gap-2"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" /> Padam Akaun Saya
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Padam Akaun?
+            </DialogTitle>
+            <DialogDescription className="space-y-1 pt-1">
+              <span className="block">Tindakan ini <strong>kekal dan tidak boleh dibatalkan</strong>. Semua data peribadi anda akan dipadam.</span>
+              <span className="block text-xs mt-1">Rekod awam (sumbangan masjid, check-in) mungkin dikekalkan sebagai rekod komuniti.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteAccountMutation.isPending}
+              onClick={() => { setDeleteOpen(false); deleteAccountMutation.mutate(); }}
+            >
+              {deleteAccountMutation.isPending ? "Memadamkan..." : "Ya, Padam Sekarang"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Footer />
     </div>

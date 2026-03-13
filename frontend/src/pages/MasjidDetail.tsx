@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   MapPin, CheckCircle, ArrowLeft, Users, Wind, Cat,
   Utensils, ThumbsUp, ThumbsDown, Loader2, Moon, Camera,
-  Flag, X, Plus, Trash2, Car, Droplets, BookOpen,
+  Flag, X, Plus, Trash2, Car, Droplets, BookOpen, AlertTriangle,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -25,12 +25,13 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import {
   masjidsApi, verificationsApi, checkinsApi, liveUpdatesApi,
-  facilitiesApi, mediaApi, ApiError,
+  facilitiesApi, mediaApi, profileApi, ApiError,
 } from "@/lib/api";
 import type { MediaType } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Masjid, Facilities, LiveStatus, VerificationStatus } from "@/types";
+import { toTitleCase } from "@/lib/utils";
 
 const VISIT_TYPES = [
   { key: "general", label: "Solat" },
@@ -107,6 +108,8 @@ const MasjidDetail = () => {
   // Facilities sheet
   const [facOpen, setFacOpen] = useState(false);
   const [facForm, setFacForm] = useState(defaultFacForm);
+  // Delete confirmation
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // ── queries ───────────────────────────────────────────────────
   const { data: masjid, isLoading, isError } = useQuery({
@@ -137,6 +140,12 @@ const MasjidDetail = () => {
     queryKey: ["media", slug],
     queryFn: () => mediaApi.get(masjid!.id),
     enabled: !!masjid?.id,
+  });
+
+  const { data: myProfile } = useQuery({
+    queryKey: ["profile", "me"],
+    queryFn: () => profileApi.get(),
+    enabled: !!user,
   });
 
   // ── mutations ─────────────────────────────────────────────────
@@ -300,6 +309,17 @@ const MasjidDetail = () => {
     },
   });
 
+  const deleteMasjidMutation = useMutation({
+    mutationFn: () => masjidsApi.remove(masjid!.id),
+    onSuccess: () => {
+      toast({ title: "Masjid dipadam", description: "Rekod masjid ini telah dipadam." });
+      navigate("/browse");
+    },
+    onError: (e) => {
+      toast({ title: "Gagal padam", description: e instanceof ApiError ? e.message : "Cuba lagi.", variant: "destructive" });
+    },
+  });
+
   // ── check in ──────────────────────────────────────────────────
   const handleCheckIn = async (visitType: string) => {
     if (!user) { toast({ title: "Log masuk diperlukan", variant: "destructive" }); navigate("/auth"); return; }
@@ -389,6 +409,7 @@ const MasjidDetail = () => {
   const m = masjid as unknown as Masjid;
   const f = (facilitiesData as Facilities | null) ?? null;
   const isVerified = m.status === "verified";
+  const canDelete = !!user && (user.id === m.created_by || !!(myProfile as { is_admin?: boolean } | null)?.is_admin);
   const live = liveStatus as LiveStatus | undefined;
   const photos = (mediaItems ?? []).filter((i) => ["main_photo", "interior_photo", "toilet_photo"].includes(i.mediaType));
   const allQrItems = (mediaItems ?? []).filter((i) => ["qr_tng", "qr_duitnow", "masjid_board"].includes(i.mediaType));
@@ -452,7 +473,7 @@ const MasjidDetail = () => {
             {/* Info */}
             <div>
               <div className="flex items-start gap-3 flex-wrap">
-                <h1 className="font-serif text-3xl font-bold text-foreground">{m.name}</h1>
+                <h1 className="font-serif text-3xl font-bold text-foreground">{toTitleCase(m.name)}</h1>
                 {isVerified ? (
                   <Badge className="bg-accent text-accent-foreground gap-1 font-sans mt-1">
                     <CheckCircle className="h-3 w-3" /> Disahkan
@@ -737,6 +758,18 @@ const MasjidDetail = () => {
                 className="w-full gap-2 text-muted-foreground hover:text-destructive justify-start px-4"
               >
                 <Flag className="h-4 w-4" /> Laporkan Masjid Ini
+              </Button>
+            )}
+
+            {/* Delete (owner / admin only) */}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeleteOpen(true)}
+                className="w-full gap-2 text-destructive/70 hover:text-destructive justify-start px-4"
+              >
+                <Trash2 className="h-4 w-4" /> Padam Masjid Ini
               </Button>
             )}
           </div>
@@ -1119,6 +1152,30 @@ const MasjidDetail = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Padam Masjid?
+            </DialogTitle>
+            <DialogDescription>
+              Tindakan ini akan memadam rekod <strong>{toTitleCase(m.name)}</strong> secara kekal. Data yang dipadam tidak boleh dipulihkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { setDeleteOpen(false); deleteMasjidMutation.mutate(); }}
+              disabled={deleteMasjidMutation.isPending}
+            >
+              {deleteMasjidMutation.isPending ? "Memadamkan..." : "Ya, Padam"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Footer />
     </div>

@@ -154,6 +154,9 @@ export const authApi = {
       headers: { Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ newPassword }),
     }),
+
+  deleteAccount: () =>
+    request<{ message: string; success: boolean }>("/api/v1/auth/account", { method: "DELETE" }),
 };
 
 export function userFromMeta(raw: {
@@ -219,6 +222,9 @@ export const masjidsApi = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  remove: (id: string) =>
+    request<{ success: boolean; message: string }>(`/api/v1/masjids/${id}`, { method: "DELETE" }),
 };
 
 // ── Facilities ────────────────────────────────────────────────────

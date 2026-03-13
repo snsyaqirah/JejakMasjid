@@ -2,6 +2,7 @@ import { MapPin, CheckCircle, Users, Wind, Cat, Utensils, Moon } from "lucide-re
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import type { Masjid } from "@/types";
+import { toTitleCase } from "@/lib/utils";
 
 export type { Masjid as MasjidData };
 
@@ -60,7 +61,7 @@ const MasjidCard = ({ masjid }: { masjid: Masjid }) => {
       {/* Content */}
       <div className="p-4">
         <h3 className="font-serif text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-          {masjid.name}
+          {toTitleCase(masjid.name)}
         </h3>
         <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" />

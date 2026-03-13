@@ -173,7 +173,7 @@ const Auth = () => {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode.length < 6) {
+    if (otpCode.length < 8) {
       toast({ title: "Kod tidak sah", description: "Masukkan kod pengesahan dari email anda.", variant: "destructive" });
       return;
     }
@@ -252,7 +252,7 @@ const Auth = () => {
                       autoFocus
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || otpCode.length < 6}>
+                  <Button type="submit" className="w-full" disabled={loading || otpCode.length < 8}>
                     {loading ? "Mengesahkan..." : "Sahkan"}
                   </Button>
                 </form>

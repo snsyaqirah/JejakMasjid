@@ -15,7 +15,9 @@ const Footer = () => {
             Meraqira
           </a>
         </p>
-        <div className="flex gap-4 text-xs text-muted-foreground">
+        <div className="flex gap-4 text-xs text-muted-foreground flex-wrap justify-center sm:justify-end">
+          <Link to="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
+          <Link to="/changelog" className="hover:text-foreground transition-colors">Kemas Kini</Link>
           <Link to="/privacy" className="hover:text-foreground transition-colors">Dasar Privasi</Link>
           <Link to="/terms" className="hover:text-foreground transition-colors">Terma Perkhidmatan</Link>
         </div>

@@ -286,10 +286,20 @@ async def create_masjid(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Masjid already exists nearby: {nearby.data[0]['name']} ({nearby.data[0]['distance_meters']:.0f}m away)"
             )
+
+        # Check if user is banned
+        ban_check = supabase.table('profiles').select('is_banned').eq(
+            'id', current_user['id']
+        ).single().execute()
+        if ban_check.data and ban_check.data.get('is_banned'):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Akaun anda telah disekat daripada menambah masjid."
+            )
         
         # Create masjid with PostGIS geography point
         masjid_data = {
-            "name": body.name,
+            "name": body.name.strip().title(),
             "address": body.address,
             "description": body.description,
             "location": f"POINT({body.longitude} {body.latitude})",  # PostGIS format
@@ -387,6 +397,8 @@ async def update_masjid(
             k: v for k, v in body.model_dump(exclude_unset=True).items()
             if k in ALLOWED_FIELDS
         }
+        if 'name' in update_data and update_data['name']:
+            update_data['name'] = update_data['name'].strip().title()
         if 'latitude' in update_data and 'longitude' in update_data:
             update_data['location'] = f"POINT({update_data.pop('longitude')} {update_data.pop('latitude')})"
         
