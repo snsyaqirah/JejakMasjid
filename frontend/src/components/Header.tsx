@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Moon, Menu, X, LogIn, LogOut, User, PlusCircle, ShieldCheck } from "lucide-react";
+import { Menu, X, LogIn, LogOut, User, PlusCircle, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -45,9 +45,7 @@ const Header = () => {
     <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
       <div className="container mx-auto flex items-center justify-between px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Moon className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src="/pwa-icon.svg" alt="JejakMasjid" className="h-9 w-9 rounded-lg" />
           <span className="font-serif text-xl font-bold text-foreground">
             JejakMasjid
           </span>
